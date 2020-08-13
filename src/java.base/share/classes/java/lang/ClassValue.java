@@ -29,6 +29,8 @@ import java.util.WeakHashMap;
 import java.lang.ref.WeakReference;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import jdk.internal.misc.Unsafe;
+
 import static java.lang.ClassValue.ClassValueMap.probeHomeLocation;
 import static java.lang.ClassValue.ClassValueMap.probeBackupLocations;
 
@@ -411,11 +413,15 @@ public abstract class ClassValue<T> {
          */
         private static final int INITIAL_ENTRIES = 32;
 
+        private static final Unsafe UNSAFE = Unsafe.getUnsafe();
+
         /** Build a backing map for ClassValues.
          *  Also, create an empty cache array and install it on the class.
          */
         ClassValueMap() {
             sizeCache(INITIAL_ENTRIES);
+            // Trailing release fence to get safe publication
+            UNSAFE.storeFence();
         }
 
         Entry<?>[] getCache() { return cacheArray; }
