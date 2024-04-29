@@ -38,13 +38,13 @@ import java.util.Random;
 import jdk.test.lib.Utils;
 
 public class ReductionPerf {
-    static final int RANGE = 8192;
+    static final int RANGE = 16*1024;
     static Random rand = Utils.getRandomInstance();
 
     public static void main(String args[]) {
         // Please increase iterations for measurement to 2_000 and 100_000.
-        int iter_warmup = 100;
-        int iter_perf   = 1_000;
+        int iter_warmup = 2_000;
+        int iter_perf   = 100_000;
 
         double[] aDouble = new double[RANGE];
         double[] bDouble = new double[RANGE];
