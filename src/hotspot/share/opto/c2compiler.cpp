@@ -566,6 +566,14 @@ bool C2Compiler::is_intrinsic_supported(vmIntrinsics::ID id) {
   case vmIntrinsics::_minD_strict:
     if (!Matcher::match_rule_supported(Op_MinD)) return false;
     break;
+  case vmIntrinsics::_maxL:
+  case vmIntrinsics::_maxL_strict:
+    if (!Matcher::match_rule_supported(Op_MaxL)) return false;
+    break;
+  case vmIntrinsics::_minL:
+  case vmIntrinsics::_minL_strict:
+    if (!Matcher::match_rule_supported(Op_MinL)) return false;
+    break;
   case vmIntrinsics::_writeback0:
     if (!Matcher::match_rule_supported(Op_CacheWB)) return false;
     break;

@@ -1688,6 +1688,7 @@ public final class StrictMath {
      * @param   b   another argument.
      * @return  the larger of {@code a} and {@code b}.
      */
+    @IntrinsicCandidate
     public static long max(long a, long b) {
         return Math.max(a, b);
     }
@@ -1755,6 +1756,7 @@ public final class StrictMath {
      * @param   b   another argument.
      * @return  the smaller of {@code a} and {@code b}.
      */
+    @IntrinsicCandidate
     public static long min(long a, long b) {
         return Math.min(a, b);
     }

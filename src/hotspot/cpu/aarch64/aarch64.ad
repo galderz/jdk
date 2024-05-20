@@ -13226,6 +13226,40 @@ instruct cmovI_reg_reg_gt(iRegINoSp dst, iRegI src1, iRegI src2, rFlagsReg cr)
 
 // This pattern is automatically generated from aarch64_ad.m4
 // DO NOT EDIT ANYTHING IN THIS SECTION OF THE FILE
+instruct cmovL_reg_reg_lt(iRegLNoSp dst, iRegL src1, iRegL src2, rFlagsReg cr)
+%{
+  effect(DEF dst, USE src1, USE src2, USE cr);
+  ins_cost(INSN_COST * 2);
+  format %{ "csel $dst, $src1, $src2 lt\t"  %}
+
+  ins_encode %{
+    __ csel($dst$$Register,
+             $src1$$Register,
+             $src2$$Register,
+             Assembler::LT);
+  %}
+  ins_pipe(icond_reg_reg);
+%}
+
+// This pattern is automatically generated from aarch64_ad.m4
+// DO NOT EDIT ANYTHING IN THIS SECTION OF THE FILE
+instruct cmovL_reg_reg_gt(iRegLNoSp dst, iRegL src1, iRegL src2, rFlagsReg cr)
+%{
+  effect(DEF dst, USE src1, USE src2, USE cr);
+  ins_cost(INSN_COST * 2);
+  format %{ "csel $dst, $src1, $src2 gt\t"  %}
+
+  ins_encode %{
+    __ csel($dst$$Register,
+             $src1$$Register,
+             $src2$$Register,
+             Assembler::GT);
+  %}
+  ins_pipe(icond_reg_reg);
+%}
+
+// This pattern is automatically generated from aarch64_ad.m4
+// DO NOT EDIT ANYTHING IN THIS SECTION OF THE FILE
 instruct cmovI_reg_imm0_lt(iRegINoSp dst, iRegI src1, rFlagsReg cr)
 %{
   effect(DEF dst, USE src1, USE cr);
@@ -15517,6 +15551,17 @@ instruct maxI_reg_reg(iRegINoSp dst, iRegIorL2I src1, iRegIorL2I src2)
   %}
 %}
 
+instruct maxL_reg_reg(iRegLNoSp dst, iRegL src1, iRegL src2)
+%{
+  match(Set dst (MaxL src1 src2));
+  ins_cost(INSN_COST * 3);
+
+  expand %{
+    rFlagsReg cr;
+    compL_reg_reg(cr, src1, src2);
+    cmovL_reg_reg_gt(dst, src1, src2, cr);
+  %}
+%}
 
 // ============================================================================
 // Branch Instructions
