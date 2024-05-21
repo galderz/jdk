@@ -8172,8 +8172,9 @@ bool LibraryCallKit::inline_fp_min_max(vmIntrinsics::ID id) {
 
 //------------------------------inline_long_min_max------------------------------
 bool LibraryCallKit::inline_long_min_max(vmIntrinsics::ID id) {
+  assert(callee()->signature()->size() == 4, "minL/maxL has 2 parameters of size 2 each.");
   Node *a = argument(0);
-  Node *b = argument(1);
+  Node *b = argument(2);
   Node *n = nullptr;
   switch (id) {
     case vmIntrinsics::_minL:
