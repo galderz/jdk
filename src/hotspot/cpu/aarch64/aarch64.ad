@@ -15539,6 +15539,18 @@ instruct minI_reg_reg(iRegINoSp dst, iRegIorL2I src1, iRegIorL2I src2)
   %}
 %}
 
+instruct minL_reg_reg(iRegINoSp dst, iRegL src1, iRegL src2)
+%{
+  match(Set dst (MinL src1 src2));
+  ins_cost(INSN_COST * 3);
+
+  expand %{
+    rFlagsReg cr;
+    compL_reg_reg(cr, src1, src2);
+    cmovL_reg_reg_lt(dst, src1, src2, cr);
+  %}
+%}
+
 instruct maxI_reg_reg(iRegINoSp dst, iRegIorL2I src1, iRegIorL2I src2)
 %{
   match(Set dst (MaxI src1 src2));
