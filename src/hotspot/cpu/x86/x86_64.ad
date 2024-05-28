@@ -11907,6 +11907,17 @@ instruct cmovI_reg_g(rRegI dst, rRegI src, rFlagsReg cr)
   ins_pipe(pipe_cmov_reg);
 %}
 
+instruct cmovL_reg_g(rRegI dst, rRegI src, rFlagsReg cr)
+%{
+  effect(USE_DEF dst, USE src, USE cr);
+
+  format %{ "cmovqgt $dst, $src\t# min" %}
+  ins_encode %{
+    __ cmovq(Assembler::greater, $dst$$Register, $src$$Register);
+  %}
+  ins_pipe(pipe_cmov_reg);
+%}
+
 
 instruct minI_rReg(rRegI dst, rRegI src)
 %{
@@ -11920,7 +11931,17 @@ instruct minI_rReg(rRegI dst, rRegI src)
   %}
 %}
 
-// TODO add minL_rReg
+instruct minL_rReg(rRegI dst, rRegI src)
+%{
+  match(Set dst (MinI dst src));
+
+  ins_cost(200);
+  expand %{
+    rFlagsReg cr;
+    compL_rReg(cr, dst, src);
+    cmovL_reg_g(dst, src, cr);
+  %}
+%}
 
 instruct cmovI_reg_l(rRegI dst, rRegI src, rFlagsReg cr)
 %{
