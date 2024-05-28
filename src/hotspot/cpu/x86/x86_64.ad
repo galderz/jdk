@@ -11933,7 +11933,7 @@ instruct minI_rReg(rRegI dst, rRegI src)
 
 instruct minL_rReg(rRegI dst, rRegI src)
 %{
-  match(Set dst (MinI dst src));
+  match(Set dst (MinL dst src));
 
   ins_cost(200);
   expand %{
