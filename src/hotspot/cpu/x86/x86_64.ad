@@ -11920,6 +11920,8 @@ instruct minI_rReg(rRegI dst, rRegI src)
   %}
 %}
 
+// TODO add minL_rReg
+
 instruct cmovI_reg_l(rRegI dst, rRegI src, rFlagsReg cr)
 %{
   effect(USE_DEF dst, USE src, USE cr);
@@ -11927,6 +11929,17 @@ instruct cmovI_reg_l(rRegI dst, rRegI src, rFlagsReg cr)
   format %{ "cmovllt $dst, $src\t# max" %}
   ins_encode %{
     __ cmovl(Assembler::less, $dst$$Register, $src$$Register);
+  %}
+  ins_pipe(pipe_cmov_reg);
+%}
+
+instruct cmovL_reg_l(rRegL dst, rRegL src, rFlagsReg cr)
+%{
+  effect(USE_DEF dst, USE src, USE cr);
+
+  format %{ "cmovqlt $dst, $src\t# max" %}
+  ins_encode %{
+    __ cmovq(Assembler::less, $dst$$Register, $src$$Register);
   %}
   ins_pipe(pipe_cmov_reg);
 %}
@@ -11941,6 +11954,18 @@ instruct maxI_rReg(rRegI dst, rRegI src)
     rFlagsReg cr;
     compI_rReg(cr, dst, src);
     cmovI_reg_l(dst, src, cr);
+  %}
+%}
+
+instruct maxL_rReg(rRegL dst, rRegL src)
+%{
+  match(Set dst (MaxL dst src));
+
+  ins_cost(200);
+  expand %{
+    rFlagsReg cr;
+    compL_rReg(cr, dst, src);
+    cmovL_reg_l(dst, src, cr);
   %}
 %}
 
