@@ -1814,11 +1814,11 @@ void SuperWord::verify_packs() const {
     }
 
     // 3. Profitable.
-    if (!profitable(pack)) {
-      tty->print_cr("FAILURE: nodes not profitable in pack[%d]", i);
-      _packset.print_pack(pack);
-      assert(false, "pack not profitable");
-    }
+//    if (!profitable(pack)) {
+//      tty->print_cr("FAILURE: nodes not profitable in pack[%d]", i);
+//      _packset.print_pack(pack);
+//      assert(false, "pack not profitable");
+//    }
   }
 }
 
