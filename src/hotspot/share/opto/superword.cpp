@@ -469,7 +469,7 @@ bool SuperWord::SLP_extract() {
   filter_packs_for_mutual_independence();
   filter_packs_for_alignment();
   filter_packs_for_implemented();
-  filter_packs_for_profitable();
+  // filter_packs_for_profitable();
 
   DEBUG_ONLY(verify_packs();)
   DEBUG_ONLY(verify_no_extract());
