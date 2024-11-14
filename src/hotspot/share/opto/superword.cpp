@@ -1546,7 +1546,8 @@ void SuperWord::filter_packs_for_profitable() {
 
   // Remove packs that are not profitable
   auto filter = [&](const Node_List* pack) {
-    return false;
+    return true;
+    // return false;
     // return profitable(pack);
   };
   _packset.filter_packs("Superword::filter_packs_for_profitable",
