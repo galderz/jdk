@@ -469,7 +469,7 @@ bool SuperWord::SLP_extract() {
   filter_packs_for_mutual_independence();
   filter_packs_for_alignment();
   filter_packs_for_implemented();
-  // filter_packs_for_profitable();
+  filter_packs_for_profitable();
 
   DEBUG_ONLY(verify_packs();)
   DEBUG_ONLY(verify_no_extract());
@@ -1546,7 +1546,8 @@ void SuperWord::filter_packs_for_profitable() {
 
   // Remove packs that are not profitable
   auto filter = [&](const Node_List* pack) {
-    return profitable(pack);
+    return false;
+    // return profitable(pack);
   };
   _packset.filter_packs("Superword::filter_packs_for_profitable",
                         "not profitable", filter);
