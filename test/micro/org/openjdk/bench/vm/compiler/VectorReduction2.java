@@ -815,6 +815,16 @@ public abstract class VectorReduction2 {
     }
 
     @Benchmark
+    public void intAddSimpleWithMultiply(Blackhole bh) {
+        int acc = 0; // neutral element
+        for (int i = 0; i < SIZE; i++) {
+            int val = 11 * in1I[i];
+            acc += val;
+        }
+        bh.consume(acc);
+    }
+
+    @Benchmark
     public void intMulSimple(Blackhole bh) {
         int acc = 1; // neutral element
         for (int i = 0; i < SIZE; i++) {
