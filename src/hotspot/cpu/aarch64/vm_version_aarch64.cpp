@@ -534,7 +534,8 @@ void VM_Version::initialize() {
 
     if (UseSVE > 0) {
       // Acquire the largest supported vector length of this machine
-      _max_supported_sve_vector_length = set_and_get_current_sve_vector_length(FloatRegister::sve_vl_max);
+      // SVE vector length passed in should be in bytes
+      _max_supported_sve_vector_length = set_and_get_current_sve_vector_length(FloatRegister::sve_vl_max / 8);
 
       if (MaxVectorSize != _max_supported_sve_vector_length) {
         int new_vl = set_and_get_current_sve_vector_length(MaxVectorSize);
