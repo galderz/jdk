@@ -12006,16 +12006,20 @@ instruct cmovI_reg_l(rRegI dst, rRegI src, rFlagsReg cr)
 %}
 
 
-instruct maxI_rReg(rRegI dst, rRegI src)
+instruct maxI_rReg(rRegI dst, rRegI src, rFlagsReg cr)
 %{
   match(Set dst (MaxI dst src));
+  effect(KILL cr);
 
   ins_cost(200);
-  expand %{
-    rFlagsReg cr;
-    compI_rReg(cr, dst, src);
-    cmovI_reg_l(dst, src, cr);
+  ins_encode %{
+    Label done;
+    __ cmpl($src$$Register, $dst$$Register);
+    __ jccb(Assembler::less, done);
+    __ mov($dst$$Register, $src$$Register);
+    __ bind(done);
   %}
+  ins_pipe(pipe_cmov_reg);
 %}
 
 // ============================================================================
