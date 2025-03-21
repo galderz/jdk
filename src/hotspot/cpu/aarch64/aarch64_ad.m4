@@ -560,6 +560,8 @@ instruct cmov$1_reg_reg_$3(iReg$1NoSp dst, iReg$1 src1, iReg$1 src2, rFlagsReg c
 ')dnl
 CMOV_INSN(I, cselw, lt)
 CMOV_INSN(I, cselw, gt)
+CMOV_INSN(L, csel, lt)
+CMOV_INSN(L, csel, gt)
 dnl
 define(`CMOV_DRAW_INSN', `// This pattern is automatically generated from aarch64_ad.m4
 // DO NOT EDIT ANYTHING IN THIS SECTION OF THE FILE
