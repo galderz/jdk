@@ -5727,17 +5727,6 @@ operand iRegL2I(iRegL reg) %{
   interface(REG_INTER)
 %}
 
-// operand iRegI2L(iRegI reg) %{
-//
-//   op_cost(0);
-//
-//   match(ConvI2L reg);
-//
-//   format %{ "i2l($reg)" %}
-//
-//   interface(REG_INTER)
-// %}
-
 operand iRegL2P(iRegL reg) %{
 
   op_cost(0);
@@ -5796,7 +5785,6 @@ opclass memory(indirect, indIndexScaled, indIndexScaledI2L, indIndexI2L, indInde
 // movw is actually redundant but its not too costly.
 
 opclass iRegIorL2I(iRegI, iRegL2I);
-// opclass iRegLorI2L(iRegL, iRegI2L);
 opclass iRegPorL2P(iRegP, iRegL2P);
 
 //----------PIPELINE-----------------------------------------------------------
@@ -15642,7 +15630,6 @@ instruct minI_reg_reg(iRegINoSp dst, iRegIorL2I src1, iRegIorL2I src2)
   %}
 %}
 
-//instruct minL_reg_reg(iRegINoSp dst, iRegLorI2L src1, iRegLorI2L src2)
 instruct minL_reg_reg(iRegLNoSp dst, iRegL src1, iRegL src2)
 %{
   match(Set dst (MinL src1 src2));
@@ -15667,7 +15654,6 @@ instruct maxI_reg_reg(iRegINoSp dst, iRegIorL2I src1, iRegIorL2I src2)
   %}
 %}
 
-//instruct maxL_reg_reg(iRegLNoSp dst, iRegLorI2L src1, iRegLorI2L src2)
 instruct maxL_reg_reg(iRegLNoSp dst, iRegL src1, iRegL src2)
 %{
   match(Set dst (MaxL src1 src2));
