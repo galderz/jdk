@@ -15654,17 +15654,37 @@ instruct maxI_reg_reg(iRegINoSp dst, iRegIorL2I src1, iRegIorL2I src2)
   %}
 %}
 
+// Option 1: cmov
+// instruct maxL_reg_reg(iRegLNoSp dst, iRegL src1, iRegL src2)
+// %{
+//   match(Set dst (MaxL src1 src2));
+//   ins_cost(INSN_COST * 3);
+//
+//   expand %{
+//     rFlagsReg cr;
+//     compL_reg_reg(cr, src1, src2);
+//     cmovL_reg_reg_gt(dst, src1, src2, cr);
+//   %}
+// %}
+
+// Option 2: branch one way
 instruct maxL_reg_reg(iRegLNoSp dst, iRegL src1, iRegL src2)
 %{
   match(Set dst (MaxL src1 src2));
   ins_cost(INSN_COST * 3);
 
-  expand %{
-    rFlagsReg cr;
-    compL_reg_reg(cr, src1, src2);
-    cmovL_reg_reg_gt(dst, src1, src2, cr);
+  ins_encode %{
+    Label done;
+    __ mov(as_Register($dst$$reg), as_Register($src2$$reg));
+    __ cmp(as_Register($dst$$reg), as_Register($src1$$reg));
+    __ br(Assembler::LT, done);
+    __ mov(as_Register($dst$$reg), as_Register($src1$$reg));
+    __ bind(done);
   %}
+  ins_pipe(pipe_cmp_branch);
 %}
+
+// TODO Option 3: branch the other way
 
 // ============================================================================
 // Branch Instructions
