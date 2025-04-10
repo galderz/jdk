@@ -65,10 +65,9 @@ mkdir -p $DEVKIT_ROOT
 # unnecessary for our purposes, without building an impossibly long exclude list.
 EXCLUDE_DIRS=" \
     Contents/_CodeSignature \
-    Contents/Applications \
+    Contents/Applications/*** \
     Contents/Resources \
     Contents/Library \
-    Contents/XPCServices \
     Contents/OtherFrameworks \
     Contents/Developer/Documentation \
     Contents/Developer/usr/share \
@@ -103,6 +102,19 @@ EXCLUDE_DIRS=" \
 
 for ex in $EXCLUDE_DIRS; do
     EXCLUDE_ARGS="$EXCLUDE_ARGS --exclude=$ex"
+done
+
+INCLUDE_DIRS=" \
+    Contents/Applications/ \
+    Contents/Applications/Instruments.app/*** \
+"
+
+#    Contents/Applications/Instruments.app/Contents/Frameworks/XCTraceCore.framework/*** \
+#    Contents/Applications/Instruments.app/Contents/Frameworks/InstrumentsTrace.framework/*** \
+#    Contents/Applications/Instruments.app/Contents/Frameworks/InstrumentsPlugIn.framework/*** \
+
+for in in $INCLUDE_DIRS; do
+    INCLUDE_ARGS="$INCLUDE_ARGS --include=$in"
 done
 
 echo "Copying Xcode.app..."
