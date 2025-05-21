@@ -136,7 +136,8 @@ Node *AddNode::Ideal(PhaseGVN *phase, bool can_reshape) {
   bool con_right = t2->singleton();
 
   // Check for commutative operation desired
-  if (commute(phase, this)) return this;
+  // todo temporarily remove commuting until branching is right
+  // if (commute(phase, this)) return this;
 
   AddNode *progress = nullptr;             // Progress flag
 
