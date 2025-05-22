@@ -35,12 +35,20 @@ public class MinMaxVector
         /**
          * Probability of one of the min/max branches being taken.
          * For max, this value represents the percentage of branches in which
-         * the value will be bigger or equal than the current max.
+         * the value will be bigger (or equal if includeEquals is enabled) than the current max.
          * For min, this value represents the percentage of branches in which
-         * the value will be smaller or equal than the current min.
+         * the value will be smaller (or equal if includeEquals is enabled) than the current min.
          */
         @Param({"50", "80", "100"})
         int probability;
+
+        /**
+         * If false, values in the min/max branches are strictly bigger/smaller than
+         * the current min/max values.
+         * If true, values in the arrays branches could be equals to the current min/max values.
+         */
+        @Param({"true", "false"})
+        boolean includeEquals;
 
         int[] minIntA;
         int[] minIntB;
@@ -55,7 +63,7 @@ public class MinMaxVector
 
         @Setup
         public void setup() {
-            final long[][] longs = distributeLongRandomIncrement(size, probability);
+            final long[][] longs = distributeLongRandomIncrement(size, probability, includeEquals);
             maxLongA = longs[0];
             maxLongB = longs[1];
             maxIntA = toInts(maxLongA);
@@ -76,9 +84,11 @@ public class MinMaxVector
             return Arrays.stream(nums).mapToInt(i -> (int) i).toArray();
         }
 
-        static long[][] distributeLongRandomIncrement(int size, int probability) {
+        static long[][] distributeLongRandomIncrement(int size, int probability, boolean includeEquals) {
+            final long aboveOrEqualsLowerBound = includeEquals ? 0 : 1;
+
             long[][] result;
-            int aboveCount, abovePercent;
+            int aboveOrEqualsCount, aboveOrEqualsPercent;
 
             // This algorithm generates 2 arrays of numbers.
             // The first array is created such that as the array is iterated,
@@ -95,16 +105,22 @@ public class MinMaxVector
                 result[0][0] = max;
                 result[1][0] = max - 1;
 
-                aboveCount = 0;
+                // Assume that the first value is above or equals to the current max
+                aboveOrEqualsCount = 1;
                 for (int i = 1; i < result[0].length; i++) {
                     long value;
-                    if (ThreadLocalRandom.current().nextLong(101) <= probability) {
-                        long increment = ThreadLocalRandom.current().nextLong(10);
+                    if (i == 1 && includeEquals) {
+                        // If include equals make sure there is at least one element that is equals to the current min/max.
+                        // So, in that case make the 2nd element in the array the same as the current min/max.
+                        value = max;
+                        aboveOrEqualsCount++;
+                    } else if (ThreadLocalRandom.current().nextLong(101) <= probability) {
+                        long increment = ThreadLocalRandom.current().nextLong(aboveOrEqualsLowerBound, 10);
                         value = max + increment;
-                        aboveCount++;
+                        aboveOrEqualsCount++;
                     } else {
-                        // Decrement by at least 1
-                        long diffToMax = ThreadLocalRandom.current().nextLong(10) + 1;
+                        // To generate a value strictly lower value, it must generate at least 1 element lower
+                        long diffToMax = ThreadLocalRandom.current().nextLong(1, 10);
                         value = max - diffToMax;
                     }
                     result[0][i] = value;
@@ -112,8 +128,8 @@ public class MinMaxVector
                     max = Math.max(max, value);
                 }
 
-                abovePercent = ((aboveCount + 1) * 100) / size;
-            } while (abovePercent != probability);
+                aboveOrEqualsPercent = (aboveOrEqualsCount * 100) / size;
+            } while (aboveOrEqualsPercent != probability);
 
             return result;
         }
