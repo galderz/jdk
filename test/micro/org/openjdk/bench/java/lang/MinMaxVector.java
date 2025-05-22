@@ -215,7 +215,7 @@ public class MinMaxVector
         int result = 0;
         for (int i = 0; i < state.size; i++) {
             final int v = 11 * state.minIntA[i];
-            result = Math.min(result, v);
+            result = Math.min(v, result);
         }
         return result;
     }
@@ -225,7 +225,7 @@ public class MinMaxVector
         int result = 0;
         for (int i = 0; i < state.size; i++) {
             final int v = state.minIntA[i];
-            result = Math.min(result, v);
+            result = Math.min(v, result);
         }
         return result;
     }
@@ -235,7 +235,7 @@ public class MinMaxVector
         int result = 0;
         for (int i = 0; i < state.size; i++) {
             final int v = 11 * state.maxIntA[i];
-            result = Math.max(result, v);
+            result = Math.max(v, result);
         }
         return result;
     }
@@ -245,7 +245,7 @@ public class MinMaxVector
         int result = 0;
         for (int i = 0; i < state.size; i++) {
             final int v = state.maxIntA[i];
-            result = Math.max(result, v);
+            result = Math.max(v, result);
         }
         return result;
     }
@@ -279,7 +279,7 @@ public class MinMaxVector
         long result = 0;
         for (int i = 0; i < state.size; i++) {
             final long v = 11 * state.minLongA[i];
-            result = Math.min(result, v);
+            result = Math.min(v, result);
         }
         return result;
     }
@@ -289,7 +289,7 @@ public class MinMaxVector
         long result = 0;
         for (int i = 0; i < state.size; i++) {
             final long v = state.minLongA[i];
-            result = Math.min(result, v);
+            result = Math.min(v, result);
         }
         return result;
     }
@@ -299,7 +299,8 @@ public class MinMaxVector
         long result = 0;
         for (int i = 0; i < state.size; i++) {
             final long v = 11 * state.maxLongA[i];
-            result = Math.max(result, v);
+            // System.out.println("Math.max(v: " + v + ", result: " + result + ")");
+            result = Math.max(v, result);
         }
         return result;
     }
@@ -309,7 +310,7 @@ public class MinMaxVector
         long result = 0;
         for (int i = 0; i < state.size; i++) {
             final long v = state.maxLongA[i];
-            result = Math.max(result, v);
+            result = Math.max(v, result);
         }
         return result;
     }
