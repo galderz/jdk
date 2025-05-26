@@ -13821,6 +13821,25 @@ instruct maxI_rReg_ndd(rRegI dst, rRegI src1, rRegI src2)
   %}
 %}
 
+// Branch always with GE
+instruct maxL_rReg_ge(rRegL dst, rRegL src, rFlagsReg cr)
+%{
+  predicate(!UseNewCode);
+  match(Set dst (MaxL dst src));
+  effect(KILL cr);
+
+  ins_cost(200);
+  ins_encode %{
+    Label done;
+    __ cmpq($dst$$Register, $src$$Register);
+    __ jccb(Assembler::greaterEqual, done); // dst (a) >= src (b) ?
+    // dst = src (b)
+    __ movq($dst$$Register, $src$$Register);
+    __ bind(done);
+  %}
+  ins_pipe(pipe_cmov_reg);
+%}
+
 // ============================================================================
 // Branch Instructions
 
