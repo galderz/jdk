@@ -13833,8 +13833,25 @@ instruct maxL_rReg_ge(rRegL dst, rRegL src, rFlagsReg cr)
     Label done;
     __ cmpq($dst$$Register, $src$$Register);
     __ jccb(Assembler::greaterEqual, done); // dst (a) >= src (b) ?
-    // dst = src (b)
-    __ movq($dst$$Register, $src$$Register);
+    __ movq($dst$$Register, $src$$Register); // dst = src (b)
+    __ bind(done);
+  %}
+  ins_pipe(pipe_cmov_reg);
+%}
+
+// Branch never with GT
+instruct maxL_rReg_gt(rRegL dst, rRegL src, rFlagsReg cr)
+%{
+  predicate(UseNewCode);
+  match(Set dst (MaxL src dst));
+  effect(KILL cr);
+
+  ins_cost(200);
+  ins_encode %{
+    Label done;
+    __ cmpq($dst$$Register, $src$$Register);
+    __ jccb(Assembler::greater, done); // dst (b) > src (a) ?
+    __ movq($dst$$Register, $src$$Register); // dst = src (a)
     __ bind(done);
   %}
   ins_pipe(pipe_cmov_reg);
