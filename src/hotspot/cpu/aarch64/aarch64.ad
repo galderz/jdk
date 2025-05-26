@@ -15770,9 +15770,10 @@ instruct maxI_reg_reg(iRegINoSp dst, iRegIorL2I src1, iRegIorL2I src2)
   %}
 %}
 
-// Branch always
-instruct maxL_reg_reg(iRegLNoSp dst, iRegL src1, iRegL src2)
+// Branch always with GE
+instruct maxL_reg_reg_ge(iRegLNoSp dst, iRegL src1, iRegL src2)
 %{
+  predicate(!UseNewCode);
   match(Set dst (MaxL src1 src2));
   effect(TEMP_DEF dst);
   ins_cost(INSN_COST * 3);
@@ -15783,6 +15784,25 @@ instruct maxL_reg_reg(iRegLNoSp dst, iRegL src1, iRegL src2)
     __ cmp(as_Register($src1$$reg), as_Register($src2$$reg)); // src1 (a) >= src2 (b) ?
     __ br(Assembler::GE, done);
     __ mov(as_Register($dst$$reg), as_Register($src2$$reg)); // dst = src2 (b)
+    __ bind(done);
+  %}
+  ins_pipe(pipe_cmp_branch);
+%}
+
+// Branch never with GT
+instruct maxL_reg_reg_gt(iRegLNoSp dst, iRegL src1, iRegL src2)
+%{
+  predicate(UseNewCode);
+  match(Set dst (MaxL src1 src2));
+  effect(TEMP_DEF dst);
+  ins_cost(INSN_COST * 3);
+
+  ins_encode %{
+    Label done;
+    __ mov(as_Register($dst$$reg), as_Register($src2$$reg)); // dst = src2 (b)
+    __ cmp(as_Register($src2$$reg), as_Register($src1$$reg)); // src1 (b) > src2 (a) ?
+    __ br(Assembler::GT, done);
+    __ mov(as_Register($dst$$reg), as_Register($src1$$reg)); // dst = src1 (a)
     __ bind(done);
   %}
   ins_pipe(pipe_cmp_branch);
