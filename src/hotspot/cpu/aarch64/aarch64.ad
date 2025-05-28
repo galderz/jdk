@@ -15808,6 +15808,44 @@ instruct maxL_reg_reg_gt(iRegLNoSp dst, iRegL src1, iRegL src2)
   ins_pipe(pipe_cmp_branch);
 %}
 
+// Branch always with LE
+instruct minL_reg_reg_le(iRegLNoSp dst, iRegL src1, iRegL src2)
+%{
+  predicate(!UseNewCode2);
+  match(Set dst (MinL src1 src2));
+  effect(TEMP_DEF dst);
+  ins_cost(INSN_COST * 3);
+
+  ins_encode %{
+    Label done;
+    __ mov(as_Register($dst$$reg), as_Register($src1$$reg)); // dst = src1 (a)
+    __ cmp(as_Register($src1$$reg), as_Register($src2$$reg)); // src1 (a) <= src2 (b) ?
+    __ br(Assembler::LE, done);
+    __ mov(as_Register($dst$$reg), as_Register($src2$$reg)); // dst = src2 (b)
+    __ bind(done);
+  %}
+  ins_pipe(pipe_cmp_branch);
+%}
+
+// Branch never with LT
+instruct minL_reg_reg_lt(iRegLNoSp dst, iRegL src1, iRegL src2)
+%{
+  predicate(UseNewCode2);
+  match(Set dst (MinL src1 src2));
+  effect(TEMP_DEF dst);
+  ins_cost(INSN_COST * 3);
+
+  ins_encode %{
+    Label done;
+    __ mov(as_Register($dst$$reg), as_Register($src2$$reg)); // dst = src2 (b)
+    __ cmp(as_Register($src2$$reg), as_Register($src1$$reg)); // src2 (b) < src1 (a) ?
+    __ br(Assembler::LT, done);
+    __ mov(as_Register($dst$$reg), as_Register($src1$$reg)); // dst = src1 (a)
+    __ bind(done);
+  %}
+  ins_pipe(pipe_cmp_branch);
+%}
+
 // ============================================================================
 // Branch Instructions
 
