@@ -2448,7 +2448,7 @@ void PhaseMacroExpand::eliminate_macro_nodes() {
                n->is_OpaqueNotNull()       ||
                n->is_OpaqueInitializedAssertionPredicate() ||
                // n->Opcode() == Op_MaxL      ||
-               n->Opcode() == Op_MinL      ||
+               // n->Opcode() == Op_MinL      ||
                BarrierSet::barrier_set()->barrier_set_c2()->is_gc_barrier_node(n),
                "unknown node type in macro list");
       }
@@ -2532,11 +2532,11 @@ bool PhaseMacroExpand::expand_macro_nodes() {
       //   _igvn.replace_node(n, repl);
       //   success = true;
       // }
-      else if (n->Opcode() == Op_MinL) {
-        Node* repl = MaxNode::signed_min(n->in(1), n->in(2), _igvn.type(n), _igvn);
-        _igvn.replace_node(n, repl);
-        success = true;
-      }
+      // else if (n->Opcode() == Op_MinL) {
+      //   Node* repl = MaxNode::signed_min(n->in(1), n->in(2), _igvn.type(n), _igvn);
+      //   _igvn.replace_node(n, repl);
+      //   success = true;
+      // }
       assert(!success || (C->macro_count() == (old_macro_count - 1)), "elimination must have deleted one node from macro list");
       progress = progress || success;
       if (success) {

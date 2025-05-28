@@ -376,8 +376,8 @@ public:
 class MinLNode : public MaxNode {
 public:
   MinLNode(Compile* C, Node* in1, Node* in2) : MaxNode(in1, in2) {
-    init_flags(Flag_is_macro);
-    C->add_macro_node(this);
+    // init_flags(Flag_is_macro);
+    // C->add_macro_node(this);
   }
   virtual int Opcode() const;
   virtual const Type* add_ring(const Type* t0, const Type* t1) const;
