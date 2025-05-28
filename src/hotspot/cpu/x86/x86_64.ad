@@ -13857,6 +13857,42 @@ instruct maxL_rReg_gt(rRegL dst, rRegL src, rFlagsReg cr)
   ins_pipe(pipe_cmov_reg);
 %}
 
+// Branch always with LE
+instruct minL_rReg_le(rRegL dst, rRegL src, rFlagsReg cr)
+%{
+  predicate(!UseNewCode2);
+  match(Set dst (MinL dst src));
+  effect(KILL cr);
+
+  ins_cost(200);
+  ins_encode %{
+    Label done;
+    __ cmpq($dst$$Register, $src$$Register);
+    __ jccb(Assembler::lessEqual, done); // dst (a) <= src (b) ?
+    __ movq($dst$$Register, $src$$Register); // dst = src (b)
+    __ bind(done);
+  %}
+  ins_pipe(pipe_cmov_reg);
+%}
+
+// Branch never with LT
+instruct minL_rReg_lt(rRegL dst, rRegL src, rFlagsReg cr)
+%{
+  predicate(UseNewCode2);
+  match(Set dst (MinL src dst));
+  effect(KILL cr);
+
+  ins_cost(200);
+  ins_encode %{
+    Label done;
+    __ cmpq($dst$$Register, $src$$Register);
+    __ jccb(Assembler::less, done); // dst (b) < src (a) ?
+    __ movq($dst$$Register, $src$$Register); // dst = src (a)
+    __ bind(done);
+  %}
+  ins_pipe(pipe_cmov_reg);
+%}
+
 // ============================================================================
 // Branch Instructions
 
