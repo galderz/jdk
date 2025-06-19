@@ -7168,7 +7168,7 @@ void C2_MacroAssembler::vector_max_min_fp16(int opcode, XMMRegister dst, XMMRegi
   }
 }
 
-static void maxL_GT_slow_path(C2_MacroAssembler& masm, C2GeneralStub<Register, Register>& stub) {
+static void maxL_GT_minL_LT_slow_path(C2_MacroAssembler& masm, C2GeneralStub<Register, Register>& stub) {
 #define __ masm.
   Register dst = stub.data<0>();
   Register src = stub.data<1>();
@@ -7181,9 +7181,17 @@ static void maxL_GT_slow_path(C2_MacroAssembler& masm, C2GeneralStub<Register, R
 }
 
 void C2_MacroAssembler::maxL_GT(Register dst, Register src) {
-  auto stub = C2CodeStub::make<Register, Register>(dst, src, 8, maxL_GT_slow_path);
+  auto stub = C2CodeStub::make<Register, Register>(dst, src, 8, maxL_GT_minL_LT_slow_path);
 
   cmpq(src, dst);
   jcc(Assembler::greater, stub->entry()); // src (b) > dst (a) ?
+  bind(stub->continuation());
+}
+
+void C2_MacroAssembler::minL_LT(Register dst, Register src) {
+  auto stub = C2CodeStub::make<Register, Register>(dst, src, 8, maxL_GT_minL_LT_slow_path);
+
+  cmpq(src, dst);
+  jcc(Assembler::less, stub->entry()); // src (b) < dst (a) ?
   bind(stub->continuation());
 }
