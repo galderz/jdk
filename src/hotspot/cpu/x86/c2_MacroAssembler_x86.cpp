@@ -7174,9 +7174,9 @@ static void maxL_GT_slow_path(C2_MacroAssembler& masm, C2GeneralStub<Register, R
   Register src = stub.data<1>();
   __ bind(stub.entry());
 
-  movq(dst, src); // dst = src (b)
+  __ movq(dst, src); // dst = src (b)
 
-  __ j(stub.continuation());
+  __ jmp(stub.continuation());
 #undef __
 }
 
