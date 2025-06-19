@@ -581,5 +581,6 @@ public:
   void reconstruct_frame_pointer(Register rtmp);
 
   void maxL_GT(Register dst, Register src);
+  void minL_LT(Register dst, Register src);
 
 #endif // CPU_X86_C2_MACROASSEMBLER_X86_HPP
