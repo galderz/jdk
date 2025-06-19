@@ -7167,3 +7167,22 @@ void C2_MacroAssembler::vector_max_min_fp16(int opcode, XMMRegister dst, XMMRegi
     Assembler::evmovdquw(dst, ktmp, xtmp1, true, vlen_enc);
   }
 }
+
+static void maxL_GT_slow_path(C2_MacroAssembler& masm, C2GeneralStub<Register, Register>& stub) {
+#define __ masm.
+  Register dst = stub.data<0>();
+  Register src = stub.data<1>();
+  __ bind(stub.entry());
+
+  movq(dst, src); // dst = src (b)
+
+  __ j(stub.continuation());
+#undef __
+}
+
+void C2_MacroAssembler::maxL_GT(Register dst, Register src) {
+  address stub = C2CodeStub::make<Register, Register>(dst, src, 20, maxL_GT_slow_path);
+
+  cmpq(src, dst);
+  jccb(Assembler::greater, stub->entry()); // src (b) > dst (a) ?
+}

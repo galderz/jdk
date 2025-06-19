@@ -13843,16 +13843,13 @@ instruct maxL_rReg_ge(rRegL dst, rRegL src, rFlagsReg cr)
 instruct maxL_rReg_gt(rRegL dst, rRegL src, rFlagsReg cr)
 %{
   predicate(UseNewCode);
-  match(Set dst (MaxL src dst));
+  match(Set dst (MaxL dst src));
   effect(KILL cr);
 
   ins_cost(200);
   ins_encode %{
     Label done;
-    __ cmpq($dst$$Register, $src$$Register);
-    __ jccb(Assembler::greater, done); // dst (b) > src (a) ?
-    __ movq($dst$$Register, $src$$Register); // dst = src (a)
-    __ bind(done);
+    __ maxL_GT($dst$$Register, $src$$Register);
   %}
   ins_pipe(pipe_cmov_reg);
 %}
