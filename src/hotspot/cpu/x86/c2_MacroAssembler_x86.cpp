@@ -7181,8 +7181,9 @@ static void maxL_GT_slow_path(C2_MacroAssembler& masm, C2GeneralStub<Register, R
 }
 
 void C2_MacroAssembler::maxL_GT(Register dst, Register src) {
-  auto stub = C2CodeStub::make<Register, Register>(dst, src, 20, maxL_GT_slow_path);
+  auto stub = C2CodeStub::make<Register, Register>(dst, src, 8, maxL_GT_slow_path);
 
   cmpq(src, dst);
-  jccb(Assembler::greater, stub->entry()); // src (b) > dst (a) ?
+  jcc(Assembler::greater, stub->entry()); // src (b) > dst (a) ?
+  bind(stub->continuation());
 }
