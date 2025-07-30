@@ -14,9 +14,8 @@ import jdk.test.lib.process.OutputAnalyzer;
 import jdk.test.lib.process.ProcessTools;
 
 import javax.lang.model.element.Modifier;
-import java.util.Arrays;
-import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -35,6 +34,48 @@ public class TestOne {
     }
 
     public static String generate(CompileFramework compiler) {
+        final Type boxType = new Type(
+            TypeKind.VALUE_CLASS,
+            "Box",
+            new Fields(new Field(boolean.class.getTypeName(), "b", new Modifiers(Modifier.FINAL))),
+            new Methods(new Method(
+                "Box",
+                new Annotations(),
+                new Modifiers(Modifier.PUBLIC),
+                "",
+                new Parameters(new Parameter(boolean.class.getTypeName(), "b")),
+                new Statements("this.b = b")))
+        );
+
+        final Method boxTest = new Method(
+            "testBox",
+            new Annotations(
+                new Annotation("Test", new Members(Map.of())),
+                new Annotation("IR", new Members(Map.of("failOn", "{ALLOC_OF_BOX_KLASS, STORE_OF_ANY_KLASS, IRNode.UNSTABLE_IF_TRAP, IRNode.PREDICATE_TRAP}")))
+            ),
+            new Modifiers(Modifier.PUBLIC),
+            "boolean",
+            new Parameters(),
+            new Statements(
+                "final Box v = new Box(true)"
+                , "return v.b"
+            )
+        );
+
+        final Method boxVerify = new Method(
+            "verifyBox",
+            new Annotations(
+                new Annotation("Run", new Members(Map.of("test", "\"testBox\"")))
+            ),
+            new Modifiers(Modifier.PUBLIC),
+            "void",
+            new Parameters(),
+            new Statements(
+                "final boolean result = testBox()"
+                , "Asserts.assertTrue(result)"
+            )
+        );
+
         return """
                package compiler.valhalla.inlinetypes.templating.generated;
 
@@ -60,26 +101,11 @@ public class TestOne {
 
                    %s
 
-                   @Test
-                   @IR(failOn = {ALLOC_OF_BOX_KLASS, STORE_OF_ANY_KLASS, IRNode.UNSTABLE_IF_TRAP, IRNode.PREDICATE_TRAP})
-                   public boolean test1() {
-                       final Box v = new Box(true);
-                       return v.b;
-                   }
+                   %s
 
-                   @Run(test = "test1")
-                   public void test1_verifier() {
-                       final boolean result = test1();
-                       Asserts.assertTrue(result);
-                   }
+                   %s
                }
-               """.formatted(
-                   new Type(
-                       TypeKind.VALUE_CLASS,
-                       "Box",
-                       new Fields(new Field(boolean.class.getTypeName(), "b", new Modifiers(Modifier.FINAL))),
-                       new Methods(new Method("Box", new Modifiers(Modifier.PUBLIC), new Parameters(new Parameter(boolean.class.getTypeName(), "b")), new Statements("this.b = b")))),
-                   mainMethod(compiler)
+               """.formatted(boxType, boxTest, boxVerify, mainMethod(compiler)
         );
     }
 
@@ -108,7 +134,6 @@ public class TestOne {
     }
 
     record Type(TypeKind kind, String name, Fields fields, Methods methods) {
-
         @Override
         public String toString() {
             return """
@@ -140,14 +165,40 @@ public class TestOne {
         }
     }
 
-    record Method(String methodName, Modifiers modifiers, Parameters parameters, Statements statements) {
+    record Method(String name, Annotations annotations, Modifiers modifiers, String returns, Parameters parameters, Statements statements) {
         @Override
         public String toString() {
             return """
-                %s %s(%s) {
+                %s
+                %s %s %s(%s) {
                     %s
                 }
-                """.formatted(modifiers, methodName, parameters, statements);
+                """.formatted(annotations, modifiers, returns, name, parameters, statements);
+        }
+    }
+
+    record Annotations(Annotation... annotations) {
+        @Override
+        public String toString() {
+            return Stream.of(annotations)
+                .map(Object::toString)
+                .collect(Collectors.joining(System.lineSeparator()));
+        }
+    }
+
+    record Annotation(String name, Members members) {
+        @Override
+        public String toString() {
+            return String.format("@%s(%s)", name, members);
+        }
+    }
+
+    record Members(Map<String, String> members) {
+        @Override
+        public String toString() {
+            return members.entrySet().stream()
+                .map(e -> e.getKey() + " = " + e.getValue())
+                .collect(Collectors.joining(", "));
         }
     }
 
