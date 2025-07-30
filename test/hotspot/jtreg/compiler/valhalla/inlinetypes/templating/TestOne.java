@@ -33,10 +33,24 @@ public class TestOne {
                }
 
                public class TestBox {
+                   static final String BOX_KLASS = "compiler/valhalla/inlinetypes/templating/.*Box\\\\w*";
+                   static final String ANY_KLASS = "compiler/valhalla/inlinetypes/templating/[\\\\w/]*";
+                   static final String POSTFIX = "#I_";
+
+                   static final String ALLOC_OF_BOX_KLASS = IRNode.PREFIX + "ALLOC_OF_BOX_KLASS" + POSTFIX;
+                   static {
+                        IRNode.allocateOfNodes(ALLOC_OF_BOX_KLASS, BOX_KLASS);
+                   }
+
+                   static final String STORE_OF_ANY_KLASS = IRNode.PREFIX + "STORE_OF_ANY_KLASS" + POSTFIX;
+                   static {
+                       IRNode.anyStoreOfNodes(STORE_OF_ANY_KLASS, ANY_KLASS);
+                   }
+
                    %s
 
                    @Test
-                   @IR(failOn = {IRNode.ALLOC, IRNode.STORE, IRNode.TRAP})
+                   @IR(failOn = {ALLOC_OF_BOX_KLASS, STORE_OF_ANY_KLASS, IRNode.UNSTABLE_IF_TRAP, IRNode.PREDICATE_TRAP})
                    public boolean test1() {
                        final Box v = new Box(true);
                        return v.b;
