@@ -14,7 +14,8 @@ import jdk.test.lib.process.OutputAnalyzer;
 import jdk.test.lib.process.ProcessTools;
 
 import javax.lang.model.element.Modifier;
-import java.lang.reflect.Type;
+import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -31,20 +32,14 @@ public class TestOne {
             """.formatted(compiler.getEscapedClassPathOfCompiledClasses());
     }
 
-    static String boxType(Field field) {
+    static String boxType(Method ctor, Field field) {
         return """
             value class Box {
-                %1$s %2$s;
+                %s
 
-                Box(%2$s) {
-                    this.%3$s = %3$s;
-                }
+                %s
             }
-            """.formatted(
-                field.modifierNames(),
-                field.declaration(),
-                field.name
-        );
+            """.formatted(ctor, field);
     }
 
     public static String generate(CompileFramework compiler) {
@@ -87,7 +82,9 @@ public class TestOne {
                    }
                }
                """.formatted(
-                   boxType(new Field(boolean.class, "b", Modifier.FINAL)),
+                   boxType(
+                       new Method("Box", new Modifiers(Modifier.PUBLIC), new Parameters(new Parameter(boolean.class.getTypeName(), "b")), new Statements("this.b = b")),
+                       new Field(boolean.class.getTypeName(), "b", new Modifiers(Modifier.FINAL))),
                    mainMethod(compiler)
         );
     }
@@ -114,13 +111,52 @@ public class TestOne {
         analyzer.shouldHaveExitValue(0);
     }
 
-    record Field(Type type, String name, Modifier... modifiers)
-    {
-        String declaration() {
-            return type.getTypeName() + " " + name;
-        }
 
-        String modifierNames() {
+    record Method(String methodName, Modifiers modifiers, Parameters parameters, Statements statements) {
+        @Override
+        public String toString() {
+            return """
+                %s %s(%s) {
+                    %s
+                }
+                """.formatted(modifiers, methodName, parameters, statements);
+        }
+    }
+
+    record Statements(String... statements) {
+        @Override
+        public String toString() {
+            return Stream.of(statements)
+                .collect(Collectors.joining(";" + System.lineSeparator(), "", ";"));
+        }
+    }
+
+    record Parameters(Parameter... parameters) {
+        @Override
+        public String toString() {
+            return Stream.of(parameters)
+                .map(Objects::toString)
+                .collect(Collectors.joining(", "));
+        }
+    }
+
+    record Parameter(String typeName, String name) {
+        @Override
+        public String toString() {
+            return typeName + " " + name;
+        }
+    }
+
+    record Field(String typeName, String name, Modifiers modifiers) {
+        @Override
+        public String toString() {
+            return String.format("%s %s %s;", modifiers, typeName, name);
+        }
+    }
+
+    record Modifiers(Modifier... modifiers) {
+        @Override
+        public String toString() {
             return Stream.of(modifiers)
                 .map(Object::toString)
                 .collect(Collectors.joining(" "));
