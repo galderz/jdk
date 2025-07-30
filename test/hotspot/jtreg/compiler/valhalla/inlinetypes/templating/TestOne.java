@@ -14,7 +14,9 @@ import jdk.test.lib.process.OutputAnalyzer;
 import jdk.test.lib.process.ProcessTools;
 
 import javax.lang.model.element.Modifier;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -30,16 +32,6 @@ public class TestOne {
                 framework.start();
             }
             """.formatted(compiler.getEscapedClassPathOfCompiledClasses());
-    }
-
-    static String boxType(Method ctor, Field field) {
-        return """
-            value class Box {
-                %s
-
-                %s
-            }
-            """.formatted(ctor, field);
     }
 
     public static String generate(CompileFramework compiler) {
@@ -82,9 +74,11 @@ public class TestOne {
                    }
                }
                """.formatted(
-                   boxType(
-                       new Method("Box", new Modifiers(Modifier.PUBLIC), new Parameters(new Parameter(boolean.class.getTypeName(), "b")), new Statements("this.b = b")),
-                       new Field(boolean.class.getTypeName(), "b", new Modifiers(Modifier.FINAL))),
+                   new Type(
+                       TypeKind.VALUE_CLASS,
+                       "Box",
+                       new Fields(new Field(boolean.class.getTypeName(), "b", new Modifiers(Modifier.FINAL))),
+                       new Methods(new Method("Box", new Modifiers(Modifier.PUBLIC), new Parameters(new Parameter(boolean.class.getTypeName(), "b")), new Statements("this.b = b")))),
                    mainMethod(compiler)
         );
     }
@@ -92,7 +86,9 @@ public class TestOne {
     public static void main(String[] args) throws Exception {
         final CompileFramework compiler = new CompileFramework();
 
-        compiler.addJavaSourceCode("TestBox", generate(compiler));
+        final String src = generate(compiler);
+        System.out.println("Source code:\n" + src);
+        compiler.addJavaSourceCode("TestBox", src);
 
         compiler.compile("--enable-preview", "--release", System.getProperty("java.specification.version"));
 
@@ -111,6 +107,38 @@ public class TestOne {
         analyzer.shouldHaveExitValue(0);
     }
 
+    record Type(TypeKind kind, String name, Fields fields, Methods methods) {
+
+        @Override
+        public String toString() {
+            return """
+                %s %s {
+                    %s
+
+                    %s
+                }
+                """.formatted(kind, name, fields, methods);
+        }
+    }
+
+    enum TypeKind {
+        VALUE_CLASS,
+        ;
+
+        @Override
+        public String toString() {
+            return name().toLowerCase(Locale.ROOT).replace("_", " ");
+        }
+    }
+
+    record Methods(Method... methods) {
+        @Override
+        public String toString() {
+            return Stream.of(methods)
+                .map(Object::toString)
+                .collect(Collectors.joining(System.lineSeparator() + System.lineSeparator()));
+        }
+    }
 
     record Method(String methodName, Modifiers modifiers, Parameters parameters, Statements statements) {
         @Override
@@ -147,10 +175,19 @@ public class TestOne {
         }
     }
 
+    record Fields(Field... fields) {
+        @Override
+        public String toString() {
+            return Stream.of(fields)
+                .map(Object::toString)
+                .collect(Collectors.joining(";" + System.lineSeparator(), "", ";"));
+        }
+    }
+
     record Field(String typeName, String name, Modifiers modifiers) {
         @Override
         public String toString() {
-            return String.format("%s %s %s;", modifiers, typeName, name);
+            return String.format("%s %s %s", modifiers, typeName, name);
         }
     }
 
