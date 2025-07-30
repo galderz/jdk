@@ -24,17 +24,9 @@ public class TestOne {
                import compiler.lib.ir_framework.*;
                import jdk.test.lib.Asserts;
 
-               value class Box {
-                   final boolean b;
-
-                   Box(boolean b) {
-                       this.b = b;
-                   }
-               }
-
                public class TestBox {
-                   static final String BOX_KLASS = "compiler/valhalla/inlinetypes/templating/.*Box\\\\w*";
-                   static final String ANY_KLASS = "compiler/valhalla/inlinetypes/templating/[\\\\w/]*";
+                   static final String BOX_KLASS = "compiler/valhalla/inlinetypes/templating/generated/.*Box\\\\w*";
+                   static final String ANY_KLASS = "compiler/valhalla/inlinetypes/templating/generated/[\\\\w/]*";
                    static final String POSTFIX = "#I_";
 
                    static final String ALLOC_OF_BOX_KLASS = IRNode.PREFIX + "ALLOC_OF_BOX_KLASS" + POSTFIX;
@@ -48,6 +40,14 @@ public class TestOne {
                    }
 
                    %s
+
+                   value class Box {
+                       final boolean b;
+
+                       Box(boolean b) {
+                           this.b = b;
+                       }
+                   }
 
                    @Test
                    @IR(failOn = {ALLOC_OF_BOX_KLASS, STORE_OF_ANY_KLASS, IRNode.UNSTABLE_IF_TRAP, IRNode.PREDICATE_TRAP})
@@ -77,6 +77,7 @@ public class TestOne {
             compiler.getEscapedClassPathOfCompiledClasses(),
             "--enable-preview",
             "-Dtest.jdk=" + System.getProperty("test.jdk"),
+            "-DReportStdout=true",
             "compiler.valhalla.inlinetypes.templating.generated.TestBox"
         };
 
@@ -93,6 +94,7 @@ public class TestOne {
                 final TestFramework framework = new TestFramework(TestBox.class);
                 framework.addFlags("-classpath", "%s");
                 framework.addFlags("--enable-preview");
+                framework.addFlags("-XX:-DoEscapeAnalysis");
                 framework.start();
             }
             """.formatted(compiler.getEscapedClassPathOfCompiledClasses());
