@@ -13,9 +13,39 @@ import compiler.lib.compile_framework.CompileFramework;
 import jdk.test.lib.process.OutputAnalyzer;
 import jdk.test.lib.process.ProcessTools;
 
+import javax.lang.model.element.Modifier;
+import java.lang.reflect.Type;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+
 public class TestOne {
 
-    // todo use more precise regex for IR failOn
+    static String mainMethod(CompileFramework compiler) {
+        return """
+            public static void main(String[] args) {
+                final TestFramework framework = new TestFramework(TestBox.class);
+                framework.addFlags("-classpath", "%s");
+                framework.addFlags("--enable-preview");
+                framework.start();
+            }
+            """.formatted(compiler.getEscapedClassPathOfCompiledClasses());
+    }
+
+    static String boxType(Field field) {
+        return """
+            value class Box {
+                %1$s %2$s;
+
+                Box(%2$s) {
+                    this.%3$s = %3$s;
+                }
+            }
+            """.formatted(
+                field.modifierNames(),
+                field.declaration(),
+                field.name
+        );
+    }
 
     public static String generate(CompileFramework compiler) {
         return """
@@ -24,13 +54,7 @@ public class TestOne {
                import compiler.lib.ir_framework.*;
                import jdk.test.lib.Asserts;
 
-               value class Box {
-                   final boolean b;
-
-                   Box(boolean b) {
-                       this.b = b;
-                   }
-               }
+               %s
 
                public class TestBox {
                    static final String BOX_KLASS = "compiler/valhalla/inlinetypes/templating/.*Box\\\\w*";
@@ -62,7 +86,10 @@ public class TestOne {
                        Asserts.assertTrue(result);
                    }
                }
-               """.formatted(mainMethod(compiler));
+               """.formatted(
+                   boxType(new Field(boolean.class, "b", Modifier.FINAL)),
+                   mainMethod(compiler)
+        );
     }
 
     public static void main(String[] args) throws Exception {
@@ -87,14 +114,16 @@ public class TestOne {
         analyzer.shouldHaveExitValue(0);
     }
 
-    static String mainMethod(CompileFramework compiler) {
-        return """
-            public static void main(String[] args) {
-                final TestFramework framework = new TestFramework(TestBox.class);
-                framework.addFlags("-classpath", "%s");
-                framework.addFlags("--enable-preview");
-                framework.start();
-            }
-            """.formatted(compiler.getEscapedClassPathOfCompiledClasses());
+    record Field(Type type, String name, Modifier... modifiers)
+    {
+        String declaration() {
+            return type.getTypeName() + " " + name;
+        }
+
+        String modifierNames() {
+            return Stream.of(modifiers)
+                .map(Object::toString)
+                .collect(Collectors.joining(" "));
+        }
     }
 }
