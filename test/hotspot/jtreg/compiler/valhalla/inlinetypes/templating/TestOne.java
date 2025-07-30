@@ -15,8 +15,6 @@ import jdk.test.lib.process.ProcessTools;
 
 public class TestOne {
 
-    // todo use more precise regex for IR failOn
-
     public static String generate(CompileFramework compiler) {
         return """
                package compiler.valhalla.inlinetypes.templating.generated;
@@ -39,12 +37,18 @@ public class TestOne {
                        IRNode.anyStoreOfNodes(STORE_OF_ANY_KLASS, ANY_KLASS);
                    }
 
-                   %s
+                   public static void main(String[] args) {
+                       final TestFramework framework = new TestFramework(TestBox.class);
+                       framework.addFlags("-classpath", "%s");
+                       framework.addFlags("--enable-preview");
+                       framework.addFlags("-XX:-DoEscapeAnalysis");
+                       framework.start();
+                   }
 
-                   value class Box {
+                   value class Box1 {
                        final boolean b;
 
-                       Box(boolean b) {
+                       Box1(boolean b) {
                            this.b = b;
                        }
                    }
@@ -52,7 +56,7 @@ public class TestOne {
                    @Test
                    @IR(failOn = {ALLOC_OF_BOX_KLASS, STORE_OF_ANY_KLASS, IRNode.UNSTABLE_IF_TRAP, IRNode.PREDICATE_TRAP})
                    public boolean test1() {
-                       final Box v = new Box(true);
+                       final Box1 v = new Box1(true);
                        return v.b;
                    }
 
@@ -62,7 +66,7 @@ public class TestOne {
                        Asserts.assertTrue(result);
                    }
                }
-               """.formatted(mainMethod(compiler));
+               """.formatted(compiler.getEscapedClassPathOfCompiledClasses());
     }
 
     public static void main(String[] args) throws Exception {
@@ -86,17 +90,5 @@ public class TestOne {
         analyzer.stdoutContains("Test complete.");
         analyzer.stdoutContains("Passed. Execution successful");
         analyzer.shouldHaveExitValue(0);
-    }
-
-    static String mainMethod(CompileFramework compiler) {
-        return """
-            public static void main(String[] args) {
-                final TestFramework framework = new TestFramework(TestBox.class);
-                framework.addFlags("-classpath", "%s");
-                framework.addFlags("--enable-preview");
-                framework.addFlags("-XX:-DoEscapeAnalysis");
-                framework.start();
-            }
-            """.formatted(compiler.getEscapedClassPathOfCompiledClasses());
     }
 }
