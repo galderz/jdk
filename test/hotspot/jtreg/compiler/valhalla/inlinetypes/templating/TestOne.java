@@ -60,9 +60,8 @@ public class TestOne {
                        return v.b;
                    }
 
-                   @Run(test = "test1")
-                   public void test1_verifier() {
-                       final boolean result = test1();
+                   @Check(test = "test1")
+                   public void test1_verifier(boolean result) {
                        Asserts.assertTrue(result);
                    }
                }
