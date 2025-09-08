@@ -91,7 +91,7 @@ public class TestOne {
             "compiler.valhalla.inlinetypes.templating.generated.TestBox",
             "main",
             new Object[] {new String[] {
-                "--enable-preview", "-XX:-DoEscapeAnalysis"
+                "--enable-preview"
                 // , "-XX:+PrintFieldLayout"
                 // , "-XX:+PrintInlining"
             }}
