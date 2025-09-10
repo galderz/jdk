@@ -59,11 +59,6 @@ public class ExampleStructuralNames
         ));
 
         var testTemplate = Template.make(() -> body(
-            """
-            // --- $test start ---
-            // $test with ...
-            // --- $test end   ---
-            """,
             Hooks.CLASS_HOOK.anchor(
                 Hooks.CLASS_HOOK.insert(templateClass.asToken()),
                 templateInstantiate.asToken()
