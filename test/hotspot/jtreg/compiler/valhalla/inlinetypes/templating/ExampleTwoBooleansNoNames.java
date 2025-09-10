@@ -31,9 +31,13 @@ import static compiler.lib.template_framework.Template.let;
 
 public class ExampleTwoBooleansNoNames
 {
-    record FieldArgument(String name, Type type, Object value) {
+    record FieldArgument(String name, PrimitiveType type, Object value) {
         String declaration() {
             return "%s %s".formatted(type.name(), name);
+        }
+
+        String hash() {
+            return "%s.hashCode(%s)".formatted(type.boxedTypeName(), value);
         }
     }
 
@@ -49,11 +53,26 @@ public class ExampleTwoBooleansNoNames
         final Map<String, Object> namedArguments = new LinkedHashMap<>();
         namedArguments.put("id", 1);
 
+        var templateHash = Template.make(() -> body(
+            """
+            int hash() {
+                return
+            """,
+            fieldArguments.stream().map(FieldArgument::hash).collect(Collectors.joining(" + ", "", " + 0;")),
+            """
+            }
+            """
+        ));
+
         var templateClass = Template.make(() -> body(
             let("id", namedArguments.get("id")),
             let("fieldDeclarations", fieldArguments.stream().map(FieldArgument::declaration).collect(Collectors.joining(", "))),
             """
-            value record Box#id(#fieldDeclarations) {}
+            value record Box#id(#fieldDeclarations) {
+            """,
+            templateHash.asToken(),
+            """
+            }
             """
         ));
 
