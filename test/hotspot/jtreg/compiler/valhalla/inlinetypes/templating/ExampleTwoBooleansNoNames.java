@@ -69,6 +69,7 @@ public class ExampleTwoBooleansNoNames
             private static int expected#id = test#id();
 
             @Test
+            @IR(failOn = {ALLOC_OF_BOX_KLASS, STORE_OF_ANY_KLASS, IRNode.UNSTABLE_IF_TRAP, IRNode.PREDICATE_TRAP})
             public static int test#id() {
                 #fieldInits
                 var box = new Box#id(#fieldNames);
@@ -94,7 +95,24 @@ public class ExampleTwoBooleansNoNames
             """
         ));
 
-        var testTemplateTokens = List.of(testTemplate.asToken());
+        var templateIrNodes = Template.make(() -> body(
+            """
+            static final String BOX_KLASS = "compiler/valhalla/inlinetypes/templating/generated/.*Box\\\\w*";
+            static final String ANY_KLASS = "compiler/valhalla/inlinetypes/templating/generated/[\\\\w/]*";
+
+            static final String ALLOC_OF_BOX_KLASS = IRNode.PREFIX + "ALLOC_OF_BOX_KLASS" + InlineTypeIRNode.POSTFIX;
+            static {
+                 IRNode.allocateOfNodes(ALLOC_OF_BOX_KLASS, BOX_KLASS);
+            }
+
+            static final String STORE_OF_ANY_KLASS = IRNode.PREFIX + "STORE_OF_ANY_KLASS" + InlineTypeIRNode.POSTFIX;
+            static {
+                IRNode.anyStoreOfNodes(STORE_OF_ANY_KLASS, ANY_KLASS);
+            }
+            """
+        ));
+
+        var testTemplateTokens = List.of(templateIrNodes.asToken(), testTemplate.asToken());
 
         return TestFrameworkClass.render(
             "compiler.valhalla.inlinetypes.templating.generated",
