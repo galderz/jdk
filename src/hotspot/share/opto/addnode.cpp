@@ -24,6 +24,8 @@
 
 #include "memory/allocation.inline.hpp"
 #include "opto/addnode.hpp"
+
+#include "loopnode.hpp"
 #include "opto/castnode.hpp"
 #include "opto/cfgnode.hpp"
 #include "opto/connode.hpp"
@@ -208,6 +210,22 @@ Node *AddNode::Ideal(PhaseGVN *phase, bool can_reshape) {
       progress = this;
     }
   }
+
+  // if (this->Opcode() == Op_MaxL) {
+  //   tty->print_cr("[avoid-cmov] ideal phase %s", can_reshape ? "can reshape" : "not shape");
+  //   this->dump();
+  // }
+
+  // if (add1->Opcode() == Op_MaxL && add2_op == Op_MaxL)
+  // {
+  //   if (!phase->C->post_loop_opts_phase())
+  //   {
+  //     tty->print_cr("[avoid-cmov] ideal phase, 2 chained max nodes");
+  //     add1->dump();
+  //     add2->dump();
+  //     // phase->C->record_for_post_loop_opts_igvn(this);
+  //   }
+  // }
 
   return progress;
 }
@@ -1725,6 +1743,75 @@ Node* MaxNode::Identity(PhaseGVN* phase) {
   Node* identity_2 = MaxNode::find_identity_operation(in(1), in(2));
   if (identity_2 != nullptr) {
     return identity_2;
+  }
+
+  if (this->Opcode() == Op_MaxL) {
+    if (!phase->C->post_loop_opts_phase()) {
+      // bool is_last_in_loop = false;
+      // for (DUIterator_Fast imax, i = fast_outs(imax); i < imax; i++) {
+      //   Node* tmp = fast_out(i);
+      //   if (tmp->is_Phi() && tmp->as_Phi()->region()->is_CountedLoop()) {
+      //   // if (tmp->is_Phi()) {
+      //   // if (tmp->Opcode() == Op_Phi) {
+      //     is_last_in_loop = true;
+      //   }
+      // }
+      //
+      // if (is_last_in_loop) {
+      //   tty->print_cr("[avoid-cmov] last max in loop");
+      //   this->dump();
+      // }
+
+      bool has_max_out = false;
+      Node* tmp = nullptr;
+      for (DUIterator_Fast imax, i = fast_outs(imax); i < imax; i++) {
+        tmp = fast_out(i);
+        if (tmp->Opcode() == Op_MaxL) {   // Check for MaxL users
+          has_max_out = true;
+          break;
+        }
+      }
+
+      bool has_max_in = false;
+      for (uint i = 1; i < req(); i++) {
+        tmp = in(i);
+        if (tmp->Opcode() == Op_MaxL) {
+          has_max_in = true;
+          break;
+        }
+      }
+
+      bool is_last_in_loop = false;
+      for (DUIterator_Fast imax, i = fast_outs(imax); i < imax; i++) {
+        tmp = fast_out(i);
+        if (tmp->is_Phi()
+          && tmp->as_Phi()->region()->is_CountedLoop()
+          && tmp->as_Phi()->region()->as_CountedLoop()->is_strip_mined()
+        ) {
+        // if (tmp->is_Phi()) {
+        // if (tmp->Opcode() == Op_Phi) {
+          is_last_in_loop = true;
+        }
+      }
+
+      if (!has_max_out && has_max_in && is_last_in_loop) {
+        tty->print("[avoid-cmov] add max node for post-loop opts: ");
+        this->dump();
+        phase->C->record_for_post_loop_opts_igvn(this);
+        // tty->print_cr("[avoid-cmov] max without max out but has max in");
+        //this->dump();
+        // tmp->dump();
+        // tty->print_cr("");
+      }
+
+      // this->in(1)->dump();
+      // this->in(2)->dump();
+      // phase->C->record_for_post_loop_opts_igvn(this);
+    }
+    // else {
+    //   tty->print_cr("[avoid-cmov] MaxNode::Identity, post_loop_opts_phase");
+    //   this->dump();
+    // }
   }
 
   return AddNode::Identity(phase);

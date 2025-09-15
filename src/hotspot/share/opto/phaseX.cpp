@@ -2734,6 +2734,73 @@ bool PhaseIterGVN::no_dependent_zero_check(Node* n) const {
   return true;
 }
 
+void PhaseIterGVN::reassociate_in_loop(Node* n) {
+  // n->in(1);
+  // tty->print("[avoid-cmov] reassociate in loop; root: ");
+  // n->dump();
+
+  tty->print("[avoid-cmov] reassociate in loop; chain:\n");
+  int chain_index = 0;
+  tty->print("  %3d: ", chain_index++);
+  n->dump();
+
+  Node* current = n;
+  //int chain_length = 1;
+  // todo which input is MaxL?
+  while (current->in(1)->Opcode() == Op_MaxL) {
+    current = current->in(1);
+    tty->print("  %3d: ", chain_index++);
+    current->dump();
+    // chain_length++;
+  }
+
+  // tty->print_cr("[avoid-cmov] reassociate in loop; chain length: %d", chain_length);
+  Node* last = current->in(1);
+  tty->print("[avoid-cmov] reassociate in loop; last: ");
+  last->dump();
+
+  // // C->remove_modified_node(n);
+  Node* reassoc = reassociate_in_loop_rebuild(last, n);
+  tty->print("[avoid-cmov] reassociate in loop; reassociated chain:\n");
+
+  chain_index = 0;
+  tty->print("  %3d: ", chain_index++);
+  reassoc->dump();
+  current = reassoc;
+  while (current->in(1)->Opcode() == Op_MaxL) {
+    current = current->in(1);
+    tty->print("  %3d: ", chain_index++);
+    current->dump();
+  }
+
+  // todo dump chain after (ala pair set), debugging
+
+  if (n != reassoc) {
+    hash_delete(n);
+    subsume_node(n, reassoc);
+
+    const Type* t = reassoc->Value(this);
+    set_type(reassoc, t);
+    ensure_type_or_null(reassoc);
+  }
+}
+
+Node* PhaseIterGVN::reassociate_in_loop_rebuild(Node* n, Node* root) {
+  if (root->Opcode() != Op_MaxL) {
+    return n;
+  }
+
+  Node* reassoc = new MaxLNode(C, reassociate_in_loop_rebuild(root->in(2), root->in(1)), n);
+
+  // todo hash_delete + subsume_node for intermediate rewired nodes?
+  // hash_delete(n);
+  // subsume_node(n, reassoc);
+
+  const Type* t = reassoc->Value(this);
+  set_type(reassoc, t);
+  return reassoc;
+}
+
 //=============================================================================
 #ifndef PRODUCT
 uint PhaseCCP::_total_invokes   = 0;
