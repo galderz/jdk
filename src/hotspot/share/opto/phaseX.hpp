@@ -583,6 +583,9 @@ public:
   bool is_dominator(Node *d, Node *n) { return is_dominator_helper(d, n, false); }
   bool no_dependent_zero_check(Node* n) const;
 
+  void reassociate_in_loop(Node* n);
+  Node* reassociate_in_loop_rebuild(Node* n, Node* root);
+
 #ifndef PRODUCT
   static bool is_verify_def_use() {
     // '-XX:VerifyIterativeGVN=1'
