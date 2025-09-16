@@ -2766,11 +2766,8 @@ void PhaseIterGVN::reassociate_in_loop(Node* n) {
     current->dump();
   }
 
-  // todo dump chain after (ala pair set), debugging
-
   if (n != reassoc) {
-    hash_delete(n);
-    subsume_node(n, reassoc);
+    replace_node(n, reassoc);
 
     const Type* t = reassoc->Value(this);
     set_type(reassoc, t);
