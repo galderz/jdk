@@ -1785,7 +1785,9 @@ Node* MaxNode::Identity(PhaseGVN* phase) {
       for (DUIterator_Fast imax, i = fast_outs(imax); i < imax; i++) {
         tmp = fast_out(i);
         if (tmp->is_Phi()
+          // todo check normal loops
           && tmp->as_Phi()->region()->is_CountedLoop()
+          // todo remove is_strip_mined
           && tmp->as_Phi()->region()->as_CountedLoop()->is_strip_mined()
         ) {
         // if (tmp->is_Phi()) {
