@@ -2782,7 +2782,7 @@ void PhaseIterGVN::reassociate_in_loop(Node* n) {
 
 void PhaseIterGVN::reassociate_in_loop_print(Node* n, int chain_index) {
   tty->print("  %3d: ", chain_index);
-  n->dump();
+  // n->dump();
   Node* left = n->in(1);
   Node* right = n->in(2);
   if (left->Opcode() == Op_MaxL) {
