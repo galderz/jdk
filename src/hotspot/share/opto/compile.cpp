@@ -1881,6 +1881,9 @@ void Compile::process_for_post_loop_opts_igvn(PhaseIterGVN& igvn) {
     while (_for_post_loop_igvn.length() > 0) {
       Node* n = _for_post_loop_igvn.pop();
       n->remove_flag(Node::NodeFlags::Flag_for_post_loop_opts_igvn);
+      if (n->Opcode() == Op_MaxL) {
+        igvn.reassociate_in_loop(n);
+      }
       igvn._worklist.push(n);
     }
     igvn.optimize();

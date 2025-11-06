@@ -27,6 +27,7 @@
 #include "opto/castnode.hpp"
 #include "opto/cfgnode.hpp"
 #include "opto/connode.hpp"
+#include "opto/loopnode.hpp"
 #include "opto/machnode.hpp"
 #include "opto/movenode.hpp"
 #include "opto/mulnode.hpp"
@@ -1725,6 +1726,48 @@ Node* MaxNode::Identity(PhaseGVN* phase) {
   Node* identity_2 = MaxNode::find_identity_operation(in(1), in(2));
   if (identity_2 != nullptr) {
     return identity_2;
+  }
+
+    if (this->Opcode() == Op_MaxL) {
+    if (!phase->C->post_loop_opts_phase()) {
+      bool has_max_out = false;
+      Node* tmp = nullptr;
+      for (DUIterator_Fast imax, i = fast_outs(imax); i < imax; i++) {
+        tmp = fast_out(i);
+        if (tmp->Opcode() == Op_MaxL) {   // Check for MaxL users
+          has_max_out = true;
+          break;
+        }
+      }
+
+      bool has_max_in = false;
+      for (uint i = 1; i < req(); i++) {
+        tmp = in(i);
+        if (tmp->Opcode() == Op_MaxL) {
+          has_max_in = true;
+          break;
+        }
+      }
+
+      bool is_last_in_loop = false;
+      for (DUIterator_Fast imax, i = fast_outs(imax); i < imax; i++) {
+        tmp = fast_out(i);
+        if (tmp->is_Phi()
+          // todo check normal loops
+          && tmp->as_Phi()->region()->is_CountedLoop()
+          // todo remove is_strip_mined
+          && tmp->as_Phi()->region()->as_CountedLoop()->is_strip_mined()
+        ) {
+          is_last_in_loop = true;
+        }
+      }
+
+      if (!has_max_out && has_max_in && is_last_in_loop) {
+        tty->print("[avoid-cmov] add max node for post-loop opts: ");
+        this->dump();
+        phase->C->record_for_post_loop_opts_igvn(this);
+      }
+    }
   }
 
   return AddNode::Identity(phase);

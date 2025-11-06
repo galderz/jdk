@@ -2734,6 +2734,102 @@ bool PhaseIterGVN::no_dependent_zero_check(Node* n) const {
   return true;
 }
 
+void PhaseIterGVN::reassociate_in_loop(Node* n) {
+  // n->in(1);
+  // tty->print("[avoid-cmov] reassociate in loop; root: ");
+  // n->dump();
+
+  tty->print("[avoid-cmov] reassociate in loop; chain:\n");
+  int chain_index = 0;
+  tty->print("  %3d: ", chain_index++);
+  n->dump();
+
+  Node* current = n;
+  //int chain_length = 1;
+  int chain_length = 0;
+  // todo which input is MaxL?
+  while (current->in(1)->Opcode() == Op_MaxL) {
+    current = current->in(1);
+    tty->print("  %3d: ", chain_index++);
+    current->dump();
+    chain_length++;
+  }
+
+  // tty->print_cr("[avoid-cmov] reassociate in loop; chain length: %d", chain_length);
+  Node* last = current->in(1);
+  tty->print("[avoid-cmov] reassociate in loop; last: ");
+  last->dump();
+
+  // // C->remove_modified_node(n);
+  Node* cursor[1] = {n};
+  Node* treeRoot = reassociate_in_loop_rebuild(chain_length, cursor);
+
+  Node* reassoc = new MaxLNode(C, last, treeRoot);
+  // const Type* t = reassoc->Value(this);
+  // set_type(reassoc, t);
+
+  if (n != reassoc) {
+    replace_node(n, reassoc);
+
+    const Type* t = reassoc->Value(this);
+    set_type(reassoc, t);
+    ensure_type_or_null(reassoc);
+  }
+
+  tty->print("[avoid-cmov] reassociate in loop; reassociated chain:\n");
+  reassociate_in_loop_print(reassoc, 0);
+}
+
+void PhaseIterGVN::reassociate_in_loop_print(Node* n, int chain_index) {
+  tty->print("  %3d: ", chain_index);
+  n->dump();
+  Node* left = n->in(1);
+  Node* right = n->in(2);
+  if (left->Opcode() == Op_MaxL) {
+    reassociate_in_loop_print(left, chain_index + 1);
+  }
+  if (right->Opcode() == Op_MaxL) {
+    reassociate_in_loop_print(right, chain_index + 1);
+  }
+}
+
+Node* PhaseIterGVN::reassociate_in_loop_rebuild(int depth, Node* cursor[]) {
+  if (depth == 1) {
+    Node* node = cursor[0];
+    if (node->Opcode() == Op_MaxL) {
+      cursor[0] = node->in(1);
+      return node->in(2);
+    }
+    cursor[0] = nullptr;
+    return node;
+  }
+
+  int leftDepth = depth / 2;
+  int rightDepth = depth - leftDepth;
+  Node* left = reassociate_in_loop_rebuild(leftDepth, cursor);
+  Node* right = reassociate_in_loop_rebuild(rightDepth, cursor);
+
+  Node* node = new MaxLNode(C, left, right);
+  const Type* t = node->Value(this);
+  set_type(node, t);
+  return node;
+  // return transform(new MaxLNode(C, left, right));
+
+  // if (root->Opcode() != Op_MaxL) {
+  //   return n;
+  // }
+  //
+  // Node* reassoc = new MaxLNode(C, reassociate_in_loop_rebuild(root->in(2), root->in(1)), n);
+  //
+  // // todo hash_delete + subsume_node for intermediate rewired nodes?
+  // // hash_delete(n);
+  // // subsume_node(n, reassoc);
+  //
+  // const Type* t = reassoc->Value(this);
+  // set_type(reassoc, t);
+  // return reassoc;
+}
+
 //=============================================================================
 #ifndef PRODUCT
 uint PhaseCCP::_total_invokes   = 0;
