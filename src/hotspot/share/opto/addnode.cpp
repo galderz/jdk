@@ -1797,8 +1797,8 @@ Node* MaxNode::Identity(PhaseGVN* phase) {
       }
 
       if (!has_max_out && has_max_in && is_last_in_loop) {
-        tty->print("[avoid-cmov] add max node for post-loop opts: ");
-        this->dump();
+        // tty->print("[avoid-cmov] add max node for post-loop opts: ");
+        // this->dump();
         phase->C->record_for_post_loop_opts_igvn(this);
         // tty->print_cr("[avoid-cmov] max without max out but has max in");
         //this->dump();
