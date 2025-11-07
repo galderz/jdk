@@ -2748,7 +2748,7 @@ void PhaseIterGVN::reassociate_in_loop(Node* n) {
   //int chain_length = 1;
   int chain_length = 0;
   // todo which input is MaxL?
-  while (current->in(1)->Opcode() == Op_MaxL) {
+  while (current->Opcode() == Op_MaxL) {
     current = current->in(1);
     // tty->print("  %3d: ", chain_index++);
     // current->dump();
@@ -2756,7 +2756,7 @@ void PhaseIterGVN::reassociate_in_loop(Node* n) {
   }
 
   // tty->print_cr("[avoid-cmov] reassociate in loop; chain length: %d", chain_length);
-  Node* last = current->in(1);
+  Node* last = current;
   // tty->print("[avoid-cmov] reassociate in loop; last: ");
   // last->dump();
 

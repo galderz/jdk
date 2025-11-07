@@ -1728,7 +1728,7 @@ Node* MaxNode::Identity(PhaseGVN* phase) {
     return identity_2;
   }
 
-    if (this->Opcode() == Op_MaxL) {
+  if (this->Opcode() == Op_MaxL) {
     if (!phase->C->post_loop_opts_phase()) {
       bool has_max_out = false;
       Node* tmp = nullptr;
