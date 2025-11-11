@@ -2739,16 +2739,19 @@ static Node* reassociate_in_loop_rebuild(Node* node, Node* root, PhaseGVN* phase
     return node;
   }
 
-  return reassociate_in_loop_rebuild(root->in(2), root->in(1), phase);
-  // Node* reassoc = new MaxLNode(phase->C, , n);
-  //
-  // // todo hash_delete + subsume_node for intermediate rewired nodes?
-  // // hash_delete(n);
-  // // subsume_node(n, reassoc);
-  //
-  // const Type* t = reassoc->Value(phase);
-  // phase->set_type(reassoc, t);
-  // return reassoc;
+  Node* left = root->in(1);
+  Node* right = root->in(2);
+
+  Node* reassoc;
+  if (left->Opcode() == Op_MaxL || left->is_Phi()) {
+    reassoc = new MaxLNode(phase->C, reassociate_in_loop_rebuild(right, left, phase), node);
+  } else {
+    reassoc = new MaxLNode(phase->C, node, reassociate_in_loop_rebuild(left, right, phase));
+  }
+
+  const Type* t = reassoc->Value(phase);
+  phase->set_type(reassoc, t);
+  return reassoc;
 }
 
 void PhaseIterGVN::reassociate_in_loop(Node* n) {
@@ -2757,12 +2760,9 @@ void PhaseIterGVN::reassociate_in_loop(Node* n) {
   // n->dump();
 
   // tty->print("[avoid-cmov] reassociate in loop; chain:\n");
-  // int chain_index = 0;
-  // tty->print("  %3d: ", chain_index++);
   // n->dump();
 
   Node* current = n;
-  //int chain_length = 1;
   do {
     Node* left = current->in(1);
     Node* right = current->in(2);
@@ -2773,29 +2773,15 @@ void PhaseIterGVN::reassociate_in_loop(Node* n) {
     }
   } while (current->Opcode() != Op_Phi);
 
-  // // todo which input is MaxL?
-  // while (current->in(1)->Opcode() == Op_MaxL) {
-  //   current = current->in(1);
-  //   // tty->print("  %3d: ", chain_index++);
-  //   // current->dump();
-  //   // chain_length++;
-  // }
-
   // tty->print_cr("[avoid-cmov] reassociate in loop; chain length: %d", chain_length);
   Node* last = current;
   // tty->print("[avoid-cmov] reassociate in loop; last: ");
   // last->dump();
 
-  // // C->remove_modified_node(n);
-  Node* reassoc_root = reassociate_in_loop_rebuild(last, n, this);
+  Node* reassoc = reassociate_in_loop_rebuild(last, n, this);
 
-  Node* reassoc = new MaxLNode(C, last, reassoc_root);
   if (n != reassoc) {
     replace_node(n, reassoc);
-
-    const Type* t = reassoc->Value(this);
-    set_type(reassoc, t);
-    ensure_type_or_null(reassoc);
   }
 }
 
