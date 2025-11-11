@@ -2802,16 +2802,14 @@ Node* PhaseIterGVN::reassociate_in_loop_rebuild(int depth, Node* queue_head[]) {
   if (depth == 1) {
     Node* node = queue_head[0];
     if (node->Opcode() == Op_MaxL) {
-      int chain_index, value_index;
-      if (node->in(1)->Opcode() == Op_MaxL || node->in(1)->Opcode() == Op_Phi) {
-        chain_index = 1;
-        value_index = 2;
-      } else {
-        chain_index = 2;
-        value_index = 1;
+      Node* left = node->in(1);
+      Node* right = node->in(2);
+      if (left->Opcode() == Op_MaxL || left->is_Phi()) {
+        queue_head[0] = left;
+        return right;
       }
-      queue_head[0] = node->in(chain_index);
-      return node->in(value_index);
+      queue_head[0] = right;
+      return left;
     }
     queue_head[0] = nullptr;
     return node;
