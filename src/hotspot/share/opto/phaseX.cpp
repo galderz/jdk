@@ -2734,6 +2734,23 @@ bool PhaseIterGVN::no_dependent_zero_check(Node* n) const {
   return true;
 }
 
+static Node* reassociate_in_loop_rebuild(Node* node, Node* root, PhaseGVN* phase) {
+  if (root->Opcode() != Op_MaxL) {
+    return node;
+  }
+
+  return reassociate_in_loop_rebuild(root->in(2), root->in(1), phase);
+  // Node* reassoc = new MaxLNode(phase->C, , n);
+  //
+  // // todo hash_delete + subsume_node for intermediate rewired nodes?
+  // // hash_delete(n);
+  // // subsume_node(n, reassoc);
+  //
+  // const Type* t = reassoc->Value(phase);
+  // phase->set_type(reassoc, t);
+  // return reassoc;
+}
+
 void PhaseIterGVN::reassociate_in_loop(Node* n) {
   // n->in(1);
   // tty->print("[avoid-cmov] reassociate in loop; root: ");
@@ -2746,33 +2763,33 @@ void PhaseIterGVN::reassociate_in_loop(Node* n) {
 
   Node* current = n;
   //int chain_length = 1;
-  // todo which input is MaxL?
-  while (current->in(1)->Opcode() == Op_MaxL) {
-    current = current->in(1);
-    // tty->print("  %3d: ", chain_index++);
-    // current->dump();
-    // chain_length++;
-  }
+  do {
+    Node* left = current->in(1);
+    Node* right = current->in(2);
+    if (left->Opcode() == Op_MaxL || left->is_Phi()) {
+      current = left;
+    } else {
+      current = right;
+    }
+  } while (current->Opcode() != Op_Phi);
+
+  // // todo which input is MaxL?
+  // while (current->in(1)->Opcode() == Op_MaxL) {
+  //   current = current->in(1);
+  //   // tty->print("  %3d: ", chain_index++);
+  //   // current->dump();
+  //   // chain_length++;
+  // }
 
   // tty->print_cr("[avoid-cmov] reassociate in loop; chain length: %d", chain_length);
-  Node* last = current->in(1);
+  Node* last = current;
   // tty->print("[avoid-cmov] reassociate in loop; last: ");
   // last->dump();
 
   // // C->remove_modified_node(n);
-  Node* reassoc = reassociate_in_loop_rebuild(last, n);
-  // tty->print("[avoid-cmov] reassociate in loop; reassociated chain:\n");
+  Node* reassoc_root = reassociate_in_loop_rebuild(last, n, this);
 
-  // chain_index = 0;
-  // tty->print("  %3d: ", chain_index++);
-  // reassoc->dump();
-  // current = reassoc;
-  // while (current->in(1)->Opcode() == Op_MaxL) {
-  //   current = current->in(1);
-  //   tty->print("  %3d: ", chain_index++);
-  //   current->dump();
-  // }
-
+  Node* reassoc = new MaxLNode(C, last, reassoc_root);
   if (n != reassoc) {
     replace_node(n, reassoc);
 
@@ -2780,22 +2797,6 @@ void PhaseIterGVN::reassociate_in_loop(Node* n) {
     set_type(reassoc, t);
     ensure_type_or_null(reassoc);
   }
-}
-
-Node* PhaseIterGVN::reassociate_in_loop_rebuild(Node* n, Node* root) {
-  if (root->Opcode() != Op_MaxL) {
-    return n;
-  }
-
-  Node* reassoc = new MaxLNode(C, reassociate_in_loop_rebuild(root->in(2), root->in(1)), n);
-
-  // todo hash_delete + subsume_node for intermediate rewired nodes?
-  // hash_delete(n);
-  // subsume_node(n, reassoc);
-
-  const Type* t = reassoc->Value(this);
-  set_type(reassoc, t);
-  return reassoc;
 }
 
 //=============================================================================
