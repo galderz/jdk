@@ -2747,9 +2747,14 @@ void PhaseIterGVN::reassociate_in_loop(Node* n) {
   Node* current = n;
   //int chain_length = 1;
   int chain_length = 0;
-  // todo which input is MaxL?
-  while (current->Opcode() == Op_MaxL) {
-    current = current->in(1);
+  while (current->Opcode() != Op_Phi) {
+    if (current->in(1)->Opcode() == Op_MaxL) {
+      current = current->in(1);
+    } else if (current->in(2)->Opcode() == Op_MaxL) {
+      current = current->in(2);
+    } else {
+      current = current->in(1)->Opcode() == Op_Phi ? current->in(1) : current->in(2);
+    }
     // tty->print("  %3d: ", chain_index++);
     // current->dump();
     chain_length++;
