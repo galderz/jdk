@@ -2761,8 +2761,8 @@ void PhaseIterGVN::reassociate_in_loop(Node* n) {
   // last->dump();
 
   // // C->remove_modified_node(n);
-  Node* cursor[1] = {n};
-  Node* treeRoot = reassociate_in_loop_rebuild(chain_length, cursor);
+  Node* queue_head[1] = {n};
+  Node* treeRoot = reassociate_in_loop_rebuild(chain_length, queue_head);
 
   Node* reassoc = new MaxLNode(C, last, treeRoot);
   // const Type* t = reassoc->Value(this);
@@ -2793,21 +2793,21 @@ void PhaseIterGVN::reassociate_in_loop_print(Node* n, int chain_index) {
   }
 }
 
-Node* PhaseIterGVN::reassociate_in_loop_rebuild(int depth, Node* cursor[]) {
+Node* PhaseIterGVN::reassociate_in_loop_rebuild(int depth, Node* queue_head[]) {
   if (depth == 1) {
-    Node* node = cursor[0];
+    Node* node = queue_head[0];
     if (node->Opcode() == Op_MaxL) {
-      cursor[0] = node->in(1);
+      queue_head[0] = node->in(1);
       return node->in(2);
     }
-    cursor[0] = nullptr;
+    queue_head[0] = nullptr;
     return node;
   }
 
   int leftDepth = depth / 2;
   int rightDepth = depth - leftDepth;
-  Node* left = reassociate_in_loop_rebuild(leftDepth, cursor);
-  Node* right = reassociate_in_loop_rebuild(rightDepth, cursor);
+  Node* left = reassociate_in_loop_rebuild(leftDepth, queue_head);
+  Node* right = reassociate_in_loop_rebuild(rightDepth, queue_head);
 
   Node* node = new MaxLNode(C, left, right);
   const Type* t = node->Value(this);
