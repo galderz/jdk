@@ -2748,12 +2748,12 @@ void PhaseIterGVN::reassociate_in_loop(Node* n) {
   //int chain_length = 1;
   int chain_length = 0;
   while (current->Opcode() != Op_Phi) {
-    if (current->in(1)->Opcode() == Op_MaxL) {
-      current = current->in(1);
-    } else if (current->in(2)->Opcode() == Op_MaxL) {
-      current = current->in(2);
+    Node* left = current->in(1);
+    Node* right = current->in(2);
+    if (left->Opcode() == Op_MaxL || left->is_Phi()) {
+      current = left;
     } else {
-      current = current->in(1)->Opcode() == Op_Phi ? current->in(1) : current->in(2);
+      current = right;
     }
     // tty->print("  %3d: ", chain_index++);
     // current->dump();
