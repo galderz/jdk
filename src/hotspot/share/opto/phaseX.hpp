@@ -584,8 +584,6 @@ public:
   bool no_dependent_zero_check(Node* n) const;
 
   void reassociate_in_loop(Node* n);
-  Node* reassociate_in_loop_rebuild(int depth, Node* queue_head[]);
-  void reassociate_in_loop_print(Node* n, int chain_index);
 
 #ifndef PRODUCT
   static bool is_verify_def_use() {
