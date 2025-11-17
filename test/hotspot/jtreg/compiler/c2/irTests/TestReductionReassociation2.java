@@ -27,6 +27,7 @@ import compiler.lib.template_framework.Template;
 import compiler.lib.template_framework.TemplateToken;
 import compiler.lib.template_framework.library.TestFrameworkClass;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
@@ -106,36 +107,110 @@ public class TestReductionReassociation2 {
     }
 
     private static String reassocLoopBody(int size, int indent) {
-        StringBuilder builder = new StringBuilder();
+        var codeBlock = new CodeBlock(1);
+        codeBlock.beginControlFlow("for (int i = 0; i < a.length; i += %d)", size);
 
-        String loopIndent = String.valueOf(' ').repeat(indent);
-        String bodyIndent = String.valueOf(' ').repeat(indent + 4);
-
-        builder.append("for (int i = 0; i < a.length; i += %d) {%n%s".formatted(size, bodyIndent));
-
-        builder.append("var v0 = a[i + 0];%n%s".formatted(bodyIndent));
+        codeBlock.addStatement("var v0 = a[i + 0]");
 
         int index = 1;
         for (int i = 1; i < size; i++) {
-            builder.append("var v%d = a[i + %d];%n%s".formatted(index, index, bodyIndent));
+            codeBlock.addStatement("var v%d = a[i + %d]", index, index);
             index++;
         }
 
         if (size == 1) {
-            builder.append("var v1 = v0;%n%s".formatted(bodyIndent));
+            codeBlock.addStatement("var v1 = v0");
         }
 
-        builder.append("var t0 = Math.max(v1, v0);%n%s".formatted(bodyIndent));
+        codeBlock.addStatement("var t0 = Math.max(v1, v0)");
 
         index = 1;
         for (int i = index; i < size - 1; i++) {
-            builder.append("var t%d = Math.max(v%d, t%d);%n%s".formatted(index, index + 1, index - 1, bodyIndent));
+            codeBlock.addStatement("var t%d = Math.max(v%d, t%d)", index, index + 1, index - 1);
             index++;
         }
 
-        builder.append("result = Math.max(result, t%d);%n%s".formatted(index - 1, loopIndent));
-        builder.append("}%n%s".formatted(loopIndent));
+        return codeBlock
+                .addStatement("result = Math.max(result, t%d)", index - 1)
+                .endControlFlow()
+                .toString();
 
-        return builder.toString();
+    }
+
+    private static final class CodeBlock {
+        final List<String> parts = new ArrayList<>();
+        final String indent = "    ";
+        final int initialIndentLevel;
+
+        CodeBlock() {
+            this.initialIndentLevel = 0;
+        }
+
+        CodeBlock(int initialIndentLevel) {
+            this.initialIndentLevel = initialIndentLevel;
+        }
+
+        CodeBlock beginControlFlow(String controlFlow, Object... args) {
+            add(controlFlow + " {\n", args);
+            indent();
+            return this;
+        }
+
+        CodeBlock addStatement(String format, Object... args) {
+            add(String.format(format + ";\n", args));
+            return this;
+        }
+
+        CodeBlock endControlFlow() {
+            unindent();
+            add("}\n");
+            return this;
+        }
+
+        private CodeBlock add(String code, Object... args) {
+            add(String.format(code, args));
+            return this;
+        }
+
+        private CodeBlock indent() {
+            this.parts.add("$>");
+            return this;
+        }
+
+        private CodeBlock unindent() {
+            this.parts.add("$<");
+            return this;
+        }
+
+        private CodeBlock add(String part) {
+            parts.add(part);
+            return this;
+        }
+
+        @Override
+        public String toString() {
+            final StringBuilder out = new StringBuilder();
+            emit(out);
+            return out.toString();
+        }
+
+        private void emit(StringBuilder out) {
+            int indentLevel = initialIndentLevel;
+            final List<String> copy = new ArrayList<>(parts);
+            if (indentLevel > 0) {
+                out.append(copy.removeFirst());
+            }
+
+            for (String part : copy) {
+                switch (part) {
+                    case "$>" -> indentLevel++;
+                    case "$<" -> indentLevel--;
+                    default -> {
+                        out.append(indent.repeat(Math.max(0, indentLevel)));
+                        out.append(part);
+                    }
+                }
+            }
+        }
     }
 }
