@@ -36,12 +36,12 @@ public class ExampleTwoLongsNoNames
         }
 
         String init() {
-            return "var %s = %s".formatted(name, value);
+            return "var %s = %sL".formatted(name, value);
         }
     }
 
     public static String generate(CompileFramework compiler) {
-        final List<PrimitiveType> types = List.of(CodeGenerationDataNameType.booleans(), CodeGenerationDataNameType.booleans());
+        final List<PrimitiveType> types = List.of(CodeGenerationDataNameType.longs(), CodeGenerationDataNameType.longs());
 
         int fieldId = 0;
         final List<FieldArgument> fieldArguments = new ArrayList<>();
@@ -56,7 +56,12 @@ public class ExampleTwoLongsNoNames
             let("id", namedArguments.get("id")),
             let("fieldDeclarations", fieldArguments.stream().map(FieldArgument::declaration).collect(Collectors.joining(", "))),
             """
-            value record Box#id(#fieldDeclarations) {}
+            value record Box#id(#fieldDeclarations) {
+                @DontInline
+                long hash() {
+                    return f0 + f1;
+                }
+            }
             """
         ));
 
@@ -64,19 +69,28 @@ public class ExampleTwoLongsNoNames
             let("id", namedArguments.get("id")),
             let("fieldInits", fieldArguments.stream().map(FieldArgument::init).collect(Collectors.joining(";\n    ", "", ";"))),
             let("fieldNames", fieldArguments.stream().map(FieldArgument::name).collect(Collectors.joining(", "))),
+            let("fieldDeclarations", fieldArguments.stream().map(FieldArgument::declaration).collect(Collectors.joining(", "))),
             """
-            private static int expected#id = test#id();
+            private static Object[] values#id = setup#id();
+            private static long expected#id = test#id((long) values#id[0], (long) values#id[1]);
+
+            @Setup
+            public static Object[] setup#id() {
+                #fieldInits
+                return new Object[]{#fieldNames};
+            }
 
             @Test
+            @Arguments(setup = "setup#id")
             @IR(failOn = {ALLOC_OF_BOX_KLASS, STORE_OF_ANY_KLASS, IRNode.UNSTABLE_IF_TRAP, IRNode.PREDICATE_TRAP})
-            public static int test#id() {
-                #fieldInits
+            public static long test#id(#fieldDeclarations) {
                 var box = new Box#id(#fieldNames);
-                return box.hashCode();
+                // return box.hashCode();
+                return box.hash();
             }
 
             @Check(test = "test#id")
-            public static void check#id(int value) {
+            public static void check#id(long value) {
                 Verify.checkEQ(value, expected#id);
             }
             """
@@ -143,6 +157,7 @@ public class ExampleTwoLongsNoNames
             "main",
             new Object[] {new String[] {
                 "--enable-preview"
+                , "-XX:-DoEscapeAnalysis"
                 // , "-XX:+PrintFieldLayout"
                 // , "-XX:+PrintInlining"
             }}
