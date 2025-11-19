@@ -4949,6 +4949,133 @@ bool PhaseIdealLoop::process_expensive_nodes() {
   return progress;
 }
 
+static Node* reassociate(int depth, Node* chain_cursor[], PhaseIdealLoop* phase) {
+  if (depth == 1) {
+    Node* node = chain_cursor[0];
+    if (node->Opcode() == Op_MaxL) {
+      Node* left = node->in(1);
+      Node* right = node->in(2);
+      if (left->Opcode() == Op_MaxL || left->is_Phi()) {
+        chain_cursor[0] = left;
+        return right;
+      }
+      chain_cursor[0] = right;
+      return left;
+    }
+    chain_cursor[0] = nullptr;
+    return node;
+  }
+
+  int left_depth = depth / 2;
+  int right_depth = depth - left_depth;
+  Node* left = reassociate(left_depth, chain_cursor, phase);
+  Node* right = reassociate(right_depth, chain_cursor, phase);
+
+  Node* node = new MaxLNode(phase->C, left, right);
+  const Type* t = node->Value(&phase->igvn());
+  phase->igvn().set_type(node, t);
+  return node;
+}
+
+static void try_reassociate(Node* phi, Node* phi_input, IdealLoopTree* lpt, PhaseIdealLoop* phase) {
+  tty->print("[avoid-cmov] try reassociate:\n");
+  tty->print("[avoid-cmov] from: ");
+  phi->dump();
+  tty->print("[avoid-cmov] via:  ");
+  phi_input->dump();
+
+  Node* current = phi_input;
+  Node* chain_head;
+  int chain_length = 1;
+  // while (current != phi) {
+  //   chain = nullptr;
+  //   for (uint i = 0; i < current->len(); i++) {
+  //     Node* node = current->in(i);
+  //     if (node == nullptr) {
+  //       continue;
+  //     }
+  //     if (node->Opcode() == Op_MaxL && phase->ctrl_is_member(lpt, node)) {
+  //       if (chain != nullptr) {
+  //         return;
+  //       }
+  //       chain_length++;
+  //       chain = node;
+  //     }
+  //   }
+  // }
+
+  // while (true) {
+  //   chain = nullptr;
+  //   for (uint i = 0; i < current->len(); i++) {
+  //     Node* node = current->in(i);
+  //     if (node == nullptr) {
+  //       continue;
+  //     }
+  //     if (node == phi) {
+  //       chain = current;
+  //       break;
+  //     }
+  //     if (node->Opcode() == Op_MaxL && phase->ctrl_is_member(lpt, node)) {
+  //       if (chain != nullptr) {
+  //         return;
+  //       }
+  //       chain_length++;
+  //       chain = node;
+  //     }
+  //     current = chain;
+  //   }
+  // }
+
+  do {
+    chain_head = nullptr;
+    for (uint i = 0; i < current->len(); i++) {
+      Node* node = current->in(i);
+      if (node == nullptr) {
+        continue;
+      }
+      if (node == phi) {
+        chain_head = current;
+        break;
+      }
+      if (node->Opcode() == Op_MaxL && phase->ctrl_is_member(lpt, node)) {
+        if (chain_head != nullptr) {
+          // Chain detection only supported via one of inputs. Reassociation via multiple paths not supported.
+          return;
+        }
+        chain_length++;
+        chain_head = node;
+      }
+    }
+    current = chain_head == current ? nullptr : chain_head;
+    // current = chain_candidate;
+  } while (current != nullptr);
+
+  // assert(chain_candidate->find_edge(phi) != -1, "chain head must have phi as input");
+
+  tty->print("[avoid-cmov] try reassociate; chain length: %d\n", chain_length);
+
+  if (chain_length == 1) {
+    // Only reassociate long enough chains
+    return;
+  }
+
+  tty->print("[avoid-cmov] try reassociate; chain head:\n");
+  chain_head->dump();
+
+  // todo deal with chain_lengths that are not power of 2
+
+  // Node* chain_cursor[1] = {chain};
+  // chain = reassociate(chain_length, chain_cursor, phase);
+  // Node* reassoc = new MaxLNode(phase->C, phi, chain);
+  // if (phi_input != reassoc) {
+  //   phase->igvn().replace_node(phi_input, reassoc);
+  //
+  //   const Type* t = reassoc->Value(&phase->igvn());
+  //   phase->igvn().set_type(reassoc, t);
+  //   phase->igvn().ensure_type_or_null(reassoc);
+  // }
+}
+
 //=============================================================================
 //----------------------------build_and_optimize-------------------------------
 // Create a PhaseLoop.  Build the ideal Loop tree.  Map each Ideal Node to
@@ -5323,6 +5450,32 @@ void PhaseIdealLoop::build_and_optimize() {
       tty->print_cr("PredicatesOff");
     }
     C->set_major_progress();
+  }
+
+  if (!C->major_progress()) {
+    for (LoopTreeIterator iter(_ltree_root); !iter.done(); iter.next()) {
+      IdealLoopTree* lpt = iter.current();
+      // todo do I need is_counted?
+      if (lpt->is_innermost() && lpt->is_counted()) {
+        Node* head = lpt->head();
+        tty->print("[avoid-cmov] loop head:");
+        head->dump();
+
+        // Look for loop head uses that are Phi
+        for (DUIterator_Fast imax, i = head->fast_outs(imax); i < imax; i++) {
+          Node* use = head->fast_out(i);
+          // Only Phi nodes with 2 inputs
+          if (use->is_Phi() && use->req() == 3) {
+            for (uint i = 1; i < use->len(); i++) {
+              Node* phi_input = use->in(i);
+              if (phi_input->Opcode() == Op_MaxL) {
+                try_reassociate(use, phi_input, lpt, this);
+              }
+            }
+          }
+        }
+      }
+    }
   }
 }
 
