@@ -4949,6 +4949,84 @@ bool PhaseIdealLoop::process_expensive_nodes() {
   return progress;
 }
 
+static Node* reassociate(int depth, Node* chain_cursor[], PhaseIdealLoop* phase) {
+  if (depth == 1) {
+    Node* node = chain_cursor[0];
+    if (node->Opcode() == Op_MaxL) {
+      Node* left = node->in(1);
+      Node* right = node->in(2);
+      if (left->Opcode() == Op_MaxL || left->is_Phi()) {
+        chain_cursor[0] = left;
+        return right;
+      }
+      chain_cursor[0] = right;
+      return left;
+    }
+    chain_cursor[0] = nullptr;
+    return node;
+  }
+
+  int left_depth = depth / 2;
+  int right_depth = depth - left_depth;
+  Node* left = reassociate(left_depth, chain_cursor, phase);
+  Node* right = reassociate(right_depth, chain_cursor, phase);
+
+  Node* node = new MaxLNode(phase->C, left, right);
+  const Type* t = node->Value(&phase->igvn());
+  phase->igvn().set_type(node, t);
+  return node;
+}
+
+static void try_reassociate(PhiNode* phi, IdealLoopTree* lpt, PhaseIdealLoop* phase) {
+  // tty->print("[avoid-cmov] try reassociate:\n");
+  // tty->print("[avoid-cmov] phi: ");
+  // phi->dump();
+  // tty->print("[avoid-cmov] uses:  ");
+  // phi_use->dump();
+
+  Node* chain_head;
+  Node* current = phi;
+  int chain_length = 0;
+  while (current != nullptr) {
+    if (current->outcnt() != 1) {
+      break;
+    }
+
+    Node* use = current->find_out_with(Op_MaxL);
+    if (use != nullptr) {
+      if (!phase->ctrl_is_member(lpt, use)) {
+        // Only interested in commutative add nodes that are in use in the loop
+        return;
+      }
+      chain_length++;
+      chain_head = use;
+    }
+
+    current = use;
+  }
+
+  // tty->print("[avoid-cmov] try reassociate; chain length: %d\n", chain_length);
+  if (chain_length < 2) {
+    // Only reassociate long enough chains
+    return;
+  }
+
+  // todo check if chain_length is power of 2
+
+  tty->print("[avoid-cmov] try reassociate; chain head:\n");
+  chain_head->dump();
+
+  Node* chain_cursor[1] = {chain_head};
+  Node* reassociated = reassociate(chain_length, chain_cursor, phase);
+
+  Node* new_chain_root = new MaxLNode(phase->C, phi, reassociated);
+  phase->igvn().replace_node(chain_head, new_chain_root);
+
+  const Type* t = new_chain_root->Value(&phase->igvn());
+  phase->igvn().set_type(new_chain_root, t);
+  phase->igvn().ensure_type_or_null(new_chain_root);
+}
+
 //=============================================================================
 //----------------------------build_and_optimize-------------------------------
 // Create a PhaseLoop.  Build the ideal Loop tree.  Map each Ideal Node to
@@ -5323,6 +5401,41 @@ void PhaseIdealLoop::build_and_optimize() {
       tty->print_cr("PredicatesOff");
     }
     C->set_major_progress();
+  }
+
+  if (!C->major_progress()) {
+    for (LoopTreeIterator iter(_ltree_root); !iter.done(); iter.next()) {
+      IdealLoopTree* lpt = iter.current();
+      // todo do I need is_counted?
+      if (lpt->is_innermost() && lpt->is_counted()) {
+        Node* loop_head = lpt->head();
+        // tty->print("[avoid-cmov] loop head:");
+        // loop_head->dump();
+
+        // Look for loop head uses that are Phi
+        for (DUIterator_Fast imax, i = loop_head->fast_outs(imax); i < imax; i++) {
+          Node* loop_head_use = loop_head->fast_out(i);
+          if (loop_head_use->is_Phi()) {
+            try_reassociate(loop_head_use->as_Phi(), lpt, this);
+          }
+
+          // // Only Phi with one out
+          // if (loop_head_use->is_Phi() && loop_head_use->outcnt() == 1) {
+          //   Node* phi_use = loop_head_use->find_out_with(Op_MaxL);
+          //   if (phi_use != nullptr) {
+          //     try_reassociate(loop_head_use, phi_use, lpt, this);
+          //   }
+          //   // Node* phi_use = loop_head_use->out()
+          //   // for (uint i = 1; i < loop_head_use->len(); i++) {
+          //   //   Node* phi_input = loop_head_use->in(i);
+          //   //   if (phi_input->Opcode() == Op_MaxL) {
+          //   //     try_reassociate(loop_head_use, phi_input, lpt, this);
+          //   //   }
+          //   // }
+          // }
+        }
+      }
+    }
   }
 }
 
