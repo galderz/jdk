@@ -81,9 +81,9 @@ public class TestReductionReassociationFuzzer {
         // Create a list to collect all tests.
         List<TemplateToken> testTemplateTokens = new ArrayList<>();
 
-        // todo add more factors
-        testTemplateTokens.add(TestGenerator.make(1).generate());
-        // testTemplateTokens.add(TestGenerator.make(2).generate());
+        // todo add a non-power 2 factor
+        List.of(1, 2, 4, 8, 16).forEach(factor ->
+            testTemplateTokens.add(TestGenerator.make(factor).generate()));
 
         // Create the test class, which runs all testTemplateTokens.
         return TestFrameworkClass.render(
@@ -147,7 +147,7 @@ public class TestReductionReassociationFuzzer {
                     ).toList(),
                     "var t0 = Math.max(v0, result);",
                     IntStream.range(1, factor).mapToObj(i ->
-                        List.of("var t", i, " = a[v", i, " + t", i - 1, "];")
+                        List.of("var t", i, " = Math.max(v", i, ", t", i - 1, ");")
                     ).toList(),
                     "result = t",
                     factor - 1,
