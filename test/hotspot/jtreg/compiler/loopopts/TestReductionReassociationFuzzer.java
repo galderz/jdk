@@ -42,6 +42,7 @@ import compiler.lib.template_framework.library.TestFrameworkClass;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 import java.util.stream.IntStream;
 
@@ -82,8 +83,9 @@ public class TestReductionReassociationFuzzer {
         List<TemplateToken> testTemplateTokens = new ArrayList<>();
 
         // todo add a non-power 2 factor
-        List.of(1, 2, 4, 8, 16).forEach(factor ->
-            testTemplateTokens.add(TestGenerator.make(factor).generate()));
+        for(int factor : List.of(1, 2, 4, 8, 16)) {
+            testTemplateTokens.add(TestGenerator.make(factor, LoopShape.Unroll).generate());
+        }
 
         // Create the test class, which runs all testTemplateTokens.
         return TestFrameworkClass.render(
@@ -101,23 +103,32 @@ public class TestReductionReassociationFuzzer {
             testTemplateTokens);
     }
 
+    enum LoopShape
+    {
+        Unroll,  // result = max(v7, max(v6, max(v5, max(v4, max(v3, max(v2, max(v1, max(v0, result))))))))
+        // Reassoc, // result = max(result, max(v7, max(v6, max(v5, max(v4, max(v3, max(v2, max(v1, v0))))))))
+        // ReTree   // result = max(result, ...)
+    }
+
     record TestGenerator(
         int factor,
-        int size
+        int size,
+        LoopShape loopShape
     ) {
 
-        public static TestGenerator make(int factor) {
+        public static TestGenerator make(int factor, LoopShape loopShape) {
             final int size = 10_000;
-            return new TestGenerator(factor, size);
+            return new TestGenerator(factor, size, loopShape);
         }
 
         public TemplateToken generate() {
+            final String id = loopShape.toString().toLowerCase(Locale.ROOT) + factor;
             var testTemplate = Template.make(() -> {
-                String test = $("test");
-                String input = $("input");
-                String expected = $("expected");
-                String setup = $("setup");
-                String check = $("check");
+                String test = $("test_" + id);
+                String input = $("input_" + id);
+                String expected = $("expected_" + id);
+                String setup = $("setup_" + id);
+                String check = $("check_" + id);
                 return scope(
                     """
                     // --- $test start ---
