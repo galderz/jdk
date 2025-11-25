@@ -53,32 +53,32 @@ public class TestReductionReassociation {
     }
 
     @Test
-    @IR(counts = {IRNode.MAX_L, "= 5"}, phase = CompilePhase.AFTER_LOOP_OPTS)
+    @IR(counts = {IRNode.MAX_L, "= 4"}, phase = CompilePhase.AFTER_LOOP_OPTS)
     public Object[] test() {
-        long resultUnroll = Integer.MIN_VALUE;
-        long resultReassocTree = Integer.MIN_VALUE;
+        long result = Integer.MIN_VALUE;
+        long result2 = Integer.MIN_VALUE;
         for (int i = 0; i < aL.length; i += 4) {
             long v0 = aL[i + 0];
             long v1 = aL[i + 1];
             long v2 = aL[i + 2];
             long v3 = aL[i + 3];
 
-            // max(v3, max(v2, max(v1, max(v0, result))))
-            long u0 = Math.max(v0, resultUnroll);
+            // result = max(v3, max(v2, max(v1, max(v0, result))))
+            long u0 = Math.max(v0, result);
             long u1 = Math.max(v1, u0);
             long u2 = Math.max(v2, u1);
             long u3 = Math.max(v3, u2);
-            resultUnroll = u3;
+            result = u3;
 
-            // max(result, max(max(v0, v1), max(v2, v3))
+            // result2 = max(result, max(max(v0, v1), max(v2, v3))
             long t0 = Math.max(v0, v1);
             long t1 = Math.max(v2, v3);
             long t2 = Math.max(t0, t1);
-            long t3 = Math.max(resultReassocTree, t2);
-            resultReassocTree = t3;
+            long t3 = Math.max(result, t2);
+            result2 = t3;
         }
 
-        return new Object[]{resultUnroll, resultReassocTree};
+        return new Object[]{result, result2};
     }
 
     // max(result, max(max(v3, v2), max(v1, v0))
