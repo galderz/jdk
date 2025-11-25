@@ -151,10 +151,6 @@ public class TestReductionReassociationFuzzer {
         private TemplateToken generateUnrollNaive() {
             var template = Template.make(() -> scope(
                 let("factor", factor),
-                "var v0 = a[i + 0];",
-                IntStream.range(1, factor).mapToObj(i ->
-                    List.of("var v", i, " = a[i + ", i, "];")
-                ).toList(),
                 "var t0 = Math.max(v0, result);",
                 IntStream.range(1, factor).mapToObj(i ->
                     List.of("var t", i, " = Math.max(v", i, ", t", i - 1, ");")
@@ -177,7 +173,11 @@ public class TestReductionReassociationFuzzer {
                 public static Object #test(long[] a) {
                     long result = Integer.MIN_VALUE;
                     for (int i = 0; i < a.length; i += #factor) {
+                        var v0 = a[i + 0];
                 """,
+                IntStream.range(1, factor).mapToObj(i ->
+                    List.of("var v", i, " = a[i + ", i, "];")
+                ).toList(),
                 switch (unroll) {
                     case Naive -> generateUnrollNaive();
                 },
