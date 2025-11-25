@@ -4977,9 +4977,9 @@ static Node* reassociate(int depth, Node* chain_cursor[], Node* loop_head, Phase
 }
 
 static void try_reassociate(PhiNode* phi, IdealLoopTree* lpt, PhaseIdealLoop* phase) {
-  tty->print("[avoid-cmov] try reassociate:\n");
-  tty->print("[avoid-cmov] phi: ");
-  phi->dump();
+  // tty->print("[avoid-cmov] try reassociate:\n");
+  // tty->print("[avoid-cmov] phi: ");
+  // phi->dump();
   // tty->print("[avoid-cmov] uses:  ");
   // phi_use->dump();
 
@@ -5004,7 +5004,7 @@ static void try_reassociate(PhiNode* phi, IdealLoopTree* lpt, PhaseIdealLoop* ph
     current = use;
   }
 
-  tty->print("[avoid-cmov] try reassociate; chain length: %d\n", chain_length);
+  // tty->print("[avoid-cmov] try reassociate; chain length: %d\n", chain_length);
   if (chain_length < 2) {
     // Only reassociate long enough chains
     return;
@@ -5012,8 +5012,8 @@ static void try_reassociate(PhiNode* phi, IdealLoopTree* lpt, PhaseIdealLoop* ph
 
   // todo check if chain_length is power of 2
 
-  tty->print("[avoid-cmov] try reassociate; chain head:\n");
-  chain_head->dump();
+  // tty->print("[avoid-cmov] try reassociate; chain head:\n");
+  // chain_head->dump();
 
   Node* chain_cursor[1] = {chain_head};
   Node* loop_head = lpt->head();
@@ -5411,8 +5411,8 @@ void PhaseIdealLoop::build_and_optimize() {
         for (DUIterator_Fast imax, i = loop_head->fast_outs(imax); i < imax; i++) {
           Node* loop_head_use = loop_head->fast_out(i);
           if (loop_head_use->is_Phi()) {
-            tty->print("[avoid-cmov] loop head:");
-            loop_head->dump();
+            // tty->print("[avoid-cmov] loop head:");
+            // loop_head->dump();
             try_reassociate(loop_head_use->as_Phi(), lpt, this);
           }
 
