@@ -84,7 +84,7 @@ public class TestReductionReassociationFuzzer {
 
         // todo add a non-power 2 factor
         for(int factor : List.of(1, 2, 4, 8, 16)) {
-            testTemplateTokens.add(TestGenerator.make(factor, LoopShape.Unroll).generate());
+            testTemplateTokens.add(TestGenerator.make(factor, Unroll.Naive).generate());
         }
 
         // Create the test class, which runs all testTemplateTokens.
@@ -103,26 +103,26 @@ public class TestReductionReassociationFuzzer {
             testTemplateTokens);
     }
 
-    enum LoopShape
+    enum Unroll
     {
-        Unroll,  // result = max(v7, max(v6, max(v5, max(v4, max(v3, max(v2, max(v1, max(v0, result))))))))
-        // Reassoc, // result = max(result, max(v7, max(v6, max(v5, max(v4, max(v3, max(v2, max(v1, v0))))))))
-        // ReTree   // result = max(result, ...)
+        Naive,  // result = max(v7, max(v6, max(v5, max(v4, max(v3, max(v2, max(v1, max(v0, result))))))))
+        // BasicReassoc, // result = max(result, max(v7, max(v6, max(v5, max(v4, max(v3, max(v2, max(v1, v0))))))))
+        // TreeReassoc   // result = max(result, ...)
     }
 
     record TestGenerator(
         int factor,
         int size,
-        LoopShape loopShape
+        Unroll unroll
     ) {
 
-        public static TestGenerator make(int factor, LoopShape loopShape) {
+        public static TestGenerator make(int factor, Unroll unroll) {
             final int size = 10_000;
-            return new TestGenerator(factor, size, loopShape);
+            return new TestGenerator(factor, size, unroll);
         }
 
         public TemplateToken generate() {
-            final String id = loopShape.toString().toLowerCase(Locale.ROOT) + factor;
+            final String id = unroll.toString().toLowerCase(Locale.ROOT) + factor;
             var testTemplate = Template.make(() -> {
                 String test = $("test_" + id);
                 String input = $("input_" + id);
@@ -148,28 +148,27 @@ public class TestReductionReassociationFuzzer {
             return testTemplate.asToken();
         }
 
-        private TemplateToken generateLoop() {
+        private TemplateToken generateUnrollNaive() {
             var template = Template.make(() -> scope(
                 let("factor", factor),
-                "for (int i = 0; i < a.length; i += #factor) {",
-                    "var v0 = a[i + 0];",
-                    IntStream.range(1, factor).mapToObj(i ->
-                        List.of("var v", i, " = a[i + ", i, "];")
-                    ).toList(),
-                    "var t0 = Math.max(v0, result);",
-                    IntStream.range(1, factor).mapToObj(i ->
-                        List.of("var t", i, " = Math.max(v", i, ", t", i - 1, ");")
-                    ).toList(),
-                    "result = t",
-                    factor - 1,
-                    ";",
-                "}"
+                "var v0 = a[i + 0];",
+                IntStream.range(1, factor).mapToObj(i ->
+                    List.of("var v", i, " = a[i + ", i, "];")
+                ).toList(),
+                "var t0 = Math.max(v0, result);",
+                IntStream.range(1, factor).mapToObj(i ->
+                    List.of("var t", i, " = Math.max(v", i, ", t", i - 1, ");")
+                ).toList(),
+                "result = t",
+                factor - 1,
+                ";"
             ));
             return template.asToken();
         }
 
         private TemplateToken generateTest(String setup, String test) {
             var template = Template.make(() -> scope(
+                let("factor", factor),
                 let("setup", setup),
                 let("test", test),
                 """
@@ -177,9 +176,13 @@ public class TestReductionReassociationFuzzer {
                 @Arguments(setup = "#setup")
                 public static Object #test(long[] a) {
                     long result = Integer.MIN_VALUE;
+                    for (int i = 0; i < a.length; i += #factor) {
                 """,
-                generateLoop(),
+                switch (unroll) {
+                    case Naive -> generateUnrollNaive();
+                },
                 """
+                    }
                     return result;
                 }
                 """
