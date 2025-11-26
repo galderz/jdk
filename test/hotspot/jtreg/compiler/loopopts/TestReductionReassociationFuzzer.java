@@ -87,6 +87,10 @@ public class TestReductionReassociationFuzzer {
             testTemplateTokens.add(TestGenerator.make(factor, Unroll.Naive).generate());
         }
 
+        for(int factor : List.of(1)) {
+            testTemplateTokens.add(TestGenerator.make(factor, Unroll.BasicReassoc).generate());
+        }
+
         // Create the test class, which runs all testTemplateTokens.
         return TestFrameworkClass.render(
             // package and class name.
@@ -106,7 +110,7 @@ public class TestReductionReassociationFuzzer {
     enum Unroll
     {
         Naive,  // result = max(v7, max(v6, max(v5, max(v4, max(v3, max(v2, max(v1, max(v0, result))))))))
-        // BasicReassoc, // result = max(result, max(v7, max(v6, max(v5, max(v4, max(v3, max(v2, max(v1, v0))))))))
+        BasicReassoc, // result = max(result, max(v7, max(v6, max(v5, max(v4, max(v3, max(v2, max(v1, v0))))))))
         // TreeReassoc   // result = max(result, ...)
     }
 
@@ -122,7 +126,7 @@ public class TestReductionReassociationFuzzer {
         }
 
         public TemplateToken generate() {
-            final String id = unroll.toString().toLowerCase(Locale.ROOT) + factor;
+            final String id = unroll.toString() + factor;
             var testTemplate = Template.make(() -> {
                 String test = $("test_" + id);
                 String input = $("input_" + id);
@@ -162,6 +166,20 @@ public class TestReductionReassociationFuzzer {
             return template.asToken();
         }
 
+        private TemplateToken generateUnrollBasicReassoc() {
+            var template = Template.make(() -> scope(
+                let("factor", factor),
+                "var t0 = v0;",
+                IntStream.range(1, factor).mapToObj(i ->
+                    List.of("var t", i, " = Math.max(v", i + 1, ", t", i - 1, ");")
+                ).toList(),
+                "result = Math.max(result, t",
+                factor - 1,
+                ");"
+            ));
+            return template.asToken();
+        }
+
         private TemplateToken generateTest(String setup, String test) {
             var template = Template.make(() -> scope(
                 let("factor", factor),
@@ -180,6 +198,7 @@ public class TestReductionReassociationFuzzer {
                 ).toList(),
                 switch (unroll) {
                     case Naive -> generateUnrollNaive();
+                    case BasicReassoc -> generateUnrollBasicReassoc();
                 },
                 """
                     }
