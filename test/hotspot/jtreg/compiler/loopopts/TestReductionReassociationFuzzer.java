@@ -87,7 +87,7 @@ public class TestReductionReassociationFuzzer {
             testTemplateTokens.add(TestGenerator.make(factor, Unroll.Naive).generate());
         }
 
-        for(int factor : List.of(1)) {
+        for(int factor : List.of(1, 2)) {
             testTemplateTokens.add(TestGenerator.make(factor, Unroll.BasicReassoc).generate());
         }
 
@@ -171,7 +171,7 @@ public class TestReductionReassociationFuzzer {
                 let("factor", factor),
                 "var t0 = v0;",
                 IntStream.range(1, factor).mapToObj(i ->
-                    List.of("var t", i, " = Math.max(v", i + 1, ", t", i - 1, ");")
+                    List.of("var t", i, " = Math.max(v", i, ", t", i - 1, ");")
                 ).toList(),
                 "result = Math.max(result, t",
                 factor - 1,
