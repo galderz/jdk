@@ -94,14 +94,19 @@ public class TestReductionReassociationFuzzer {
         // Create a list to collect all tests.
         List<TemplateToken> testTemplateTokens = new ArrayList<>();
 
-        // todo add a non-power 2 factor
+        final int size = 10_000;
+
         for(int factor : List.of(1, 2, 4, 8, 16)) {
-            testTemplateTokens.add(TestGenerator.make(factor, ManualUnroll.Naive).generate());
+            testTemplateTokens.add(TestGenerator.make(factor, size, ManualUnroll.Naive).generate());
         }
 
         for(int factor : List.of(1, 2, 4, 8, 16)) {
-            testTemplateTokens.add(TestGenerator.make(factor, ManualUnroll.Reassoc).generate());
+            testTemplateTokens.add(TestGenerator.make(factor, size, ManualUnroll.Reassoc).generate());
         }
+
+        // Try a non-factor of 2 that the size is divisible by
+        testTemplateTokens.add(TestGenerator.make(5, size, ManualUnroll.Naive).generate());
+        testTemplateTokens.add(TestGenerator.make(5, size, ManualUnroll.Reassoc).generate());
 
         // Create the test class, which runs all testTemplateTokens.
         return TestFrameworkClass.render(
@@ -131,8 +136,7 @@ public class TestReductionReassociationFuzzer {
         ManualUnroll manualUnroll
     ) {
 
-        public static TestGenerator make(int factor, ManualUnroll unroll) {
-            final int size = 10_000;
+        public static TestGenerator make(int factor, int size, ManualUnroll unroll) {
             return new TestGenerator(factor, size, unroll);
         }
 

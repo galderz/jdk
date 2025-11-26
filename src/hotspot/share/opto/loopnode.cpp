@@ -5012,7 +5012,12 @@ static void try_reassociate(PhiNode* phi, IdealLoopTree* lpt, PhaseIdealLoop* ph
     return;
   }
 
-  // todo check if chain_length is power of 2
+  if (!is_power_of_2(chain_length)) {
+    // If not power of 2 chains are common enough, they could be reassociated
+    // in a simpler way without using a tree. Moving the Phi value to the front
+    // would be enough to get a performance boost.
+    return;
+  }
 
   // tty->print("[avoid-cmov] try reassociate; chain length: %d\n", chain_length);
   // tty->print("[avoid-cmov] try reassociate:\n");
