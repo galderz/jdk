@@ -4977,9 +4977,6 @@ static Node* reassociate(int depth, Node* chain_cursor[], Node* loop_head, Phase
 }
 
 static void try_reassociate(PhiNode* phi, IdealLoopTree* lpt, PhaseIdealLoop* phase) {
-  // tty->print("[avoid-cmov] try reassociate:\n");
-  // tty->print("[avoid-cmov] phi: ");
-  // phi->dump();
   // tty->print("[avoid-cmov] uses:  ");
   // phi_use->dump();
 
@@ -5004,7 +5001,6 @@ static void try_reassociate(PhiNode* phi, IdealLoopTree* lpt, PhaseIdealLoop* ph
     current = use;
   }
 
-  // tty->print("[avoid-cmov] try reassociate; chain length: %d\n", chain_length);
   if (chain_length < 2) {
     // Only reassociate long enough chains
     return;
@@ -5012,6 +5008,10 @@ static void try_reassociate(PhiNode* phi, IdealLoopTree* lpt, PhaseIdealLoop* ph
 
   // todo check if chain_length is power of 2
 
+  // tty->print("[avoid-cmov] try reassociate; chain length: %d\n", chain_length);
+  // tty->print("[avoid-cmov] try reassociate:\n");
+  // tty->print("[avoid-cmov] phi: ");
+  // phi->dump();
   // tty->print("[avoid-cmov] try reassociate; chain head:\n");
   // chain_head->dump();
 
