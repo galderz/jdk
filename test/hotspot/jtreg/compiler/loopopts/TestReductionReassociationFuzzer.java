@@ -33,6 +33,18 @@
  * @run driver compiler.loopopts.TestReductionReassociationFuzzer vanilla
  */
 
+/*
+ * @test id=unroll
+ * @bug 8351409
+ * @summary Test reduction reassociation with additional unrolling
+ * @modules java.base/jdk.internal.misc
+ * @library /test/lib /
+ * @compile ../../compiler/lib/ir_framework/TestFramework.java
+ * @compile ../../compiler/lib/generators/Generators.java
+ * @compile ../../compiler/lib/verify/Verify.java
+ * @run driver compiler.loopopts.TestReductionReassociationFuzzer unroll
+ */
+
 package compiler.loopopts;
 
 import compiler.lib.compile_framework.CompileFramework;
@@ -64,6 +76,7 @@ public class TestReductionReassociationFuzzer {
 
         String[] flags = switch(args[0]) {
             case "vanilla" -> new String[] {"-XX:-UseSuperWord", "-XX:LoopMaxUnroll=0"};
+            case "unroll" -> new String[] {"-XX:-UseSuperWord"};
             // case "random-flags" -> randomFlags();
             default -> throw new RuntimeException("unknown run id=" + args[0]);
         };
@@ -86,9 +99,9 @@ public class TestReductionReassociationFuzzer {
             testTemplateTokens.add(TestGenerator.make(factor, ManualUnroll.Naive).generate());
         }
 
-        for(int factor : List.of(1, 2)) {
-            testTemplateTokens.add(TestGenerator.make(factor, ManualUnroll.BasicReassoc).generate());
-        }
+//        for(int factor : List.of(1, 2)) {
+//            testTemplateTokens.add(TestGenerator.make(factor, ManualUnroll.BasicReassoc).generate());
+//        }
 
         // Create the test class, which runs all testTemplateTokens.
         return TestFrameworkClass.render(
