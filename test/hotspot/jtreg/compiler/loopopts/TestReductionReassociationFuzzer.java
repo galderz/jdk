@@ -42,7 +42,6 @@ import compiler.lib.template_framework.library.TestFrameworkClass;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 import java.util.Set;
 import java.util.stream.IntStream;
 
@@ -84,11 +83,11 @@ public class TestReductionReassociationFuzzer {
 
         // todo add a non-power 2 factor
         for(int factor : List.of(1, 2, 4, 8, 16)) {
-            testTemplateTokens.add(TestGenerator.make(factor, Unroll.Naive).generate());
+            testTemplateTokens.add(TestGenerator.make(factor, ManualUnroll.Naive).generate());
         }
 
         for(int factor : List.of(1, 2)) {
-            testTemplateTokens.add(TestGenerator.make(factor, Unroll.BasicReassoc).generate());
+            testTemplateTokens.add(TestGenerator.make(factor, ManualUnroll.BasicReassoc).generate());
         }
 
         // Create the test class, which runs all testTemplateTokens.
@@ -107,7 +106,7 @@ public class TestReductionReassociationFuzzer {
             testTemplateTokens);
     }
 
-    enum Unroll
+    enum ManualUnroll
     {
         Naive,  // result = max(v7, max(v6, max(v5, max(v4, max(v3, max(v2, max(v1, max(v0, result))))))))
         BasicReassoc, // result = max(result, max(v7, max(v6, max(v5, max(v4, max(v3, max(v2, max(v1, v0))))))))
@@ -117,16 +116,16 @@ public class TestReductionReassociationFuzzer {
     record TestGenerator(
         int factor,
         int size,
-        Unroll unroll
+        ManualUnroll manualUnroll
     ) {
 
-        public static TestGenerator make(int factor, Unroll unroll) {
+        public static TestGenerator make(int factor, ManualUnroll unroll) {
             final int size = 10_000;
             return new TestGenerator(factor, size, unroll);
         }
 
         public TemplateToken generate() {
-            final String id = unroll.toString() + factor;
+            final String id = manualUnroll.toString() + factor;
             var testTemplate = Template.make(() -> {
                 String test = $("test_" + id);
                 String input = $("input_" + id);
@@ -152,7 +151,7 @@ public class TestReductionReassociationFuzzer {
             return testTemplate.asToken();
         }
 
-        private TemplateToken generateUnrollNaive() {
+        private TemplateToken generateManualUnrollNaive() {
             var template = Template.make(() -> scope(
                 let("factor", factor),
                 "var t0 = Math.max(v0, result);",
@@ -166,7 +165,7 @@ public class TestReductionReassociationFuzzer {
             return template.asToken();
         }
 
-        private TemplateToken generateUnrollBasicReassoc() {
+        private TemplateToken generateManualUnrollBasicReassoc() {
             var template = Template.make(() -> scope(
                 let("factor", factor),
                 "var t0 = v0;",
@@ -196,9 +195,9 @@ public class TestReductionReassociationFuzzer {
                 IntStream.range(1, factor).mapToObj(i ->
                     List.of("var v", i, " = a[i + ", i, "];")
                 ).toList(),
-                switch (unroll) {
-                    case Naive -> generateUnrollNaive();
-                    case BasicReassoc -> generateUnrollBasicReassoc();
+                switch (manualUnroll) {
+                    case Naive -> generateManualUnrollNaive();
+                    case BasicReassoc -> generateManualUnrollBasicReassoc();
                 },
                 """
                     }
