@@ -100,7 +100,7 @@ public class TestReductionReassociationFuzzer {
         }
 
         for(int factor : List.of(1, 2, 4, 8, 16)) {
-            testTemplateTokens.add(TestGenerator.make(factor, ManualUnroll.BasicReassoc).generate());
+            testTemplateTokens.add(TestGenerator.make(factor, ManualUnroll.Reassoc).generate());
         }
 
         // Create the test class, which runs all testTemplateTokens.
@@ -122,8 +122,7 @@ public class TestReductionReassociationFuzzer {
     enum ManualUnroll
     {
         Naive,  // result = max(v7, max(v6, max(v5, max(v4, max(v3, max(v2, max(v1, max(v0, result))))))))
-        BasicReassoc, // result = max(result, max(v7, max(v6, max(v5, max(v4, max(v3, max(v2, max(v1, v0))))))))
-        // TreeReassoc   // result = max(result, ...)
+        Reassoc, // result = max(result, max(v7, max(v6, max(v5, max(v4, max(v3, max(v2, max(v1, v0))))))))
     }
 
     record TestGenerator(
@@ -178,7 +177,7 @@ public class TestReductionReassociationFuzzer {
             return template.asToken();
         }
 
-        private TemplateToken generateManualUnrollBasicReassoc() {
+        private TemplateToken generateManualUnrollReassoc() {
             var template = Template.make(() -> scope(
                 let("factor", factor),
                 "var t0 = v0;",
@@ -210,7 +209,7 @@ public class TestReductionReassociationFuzzer {
                 ).toList(),
                 switch (manualUnroll) {
                     case Naive -> generateManualUnrollNaive();
-                    case BasicReassoc -> generateManualUnrollBasicReassoc();
+                    case Reassoc -> generateManualUnrollReassoc();
                 },
                 """
                     }
