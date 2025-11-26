@@ -34,15 +34,15 @@
  */
 
 /*
- * @test id=unroll
+ * @test id=no-superword
  * @bug 8351409
- * @summary Test reduction reassociation with additional unrolling
+ * @summary Test reduction reassociation disabling superword
  * @modules java.base/jdk.internal.misc
  * @library /test/lib /
  * @compile ../../compiler/lib/ir_framework/TestFramework.java
  * @compile ../../compiler/lib/generators/Generators.java
  * @compile ../../compiler/lib/verify/Verify.java
- * @run driver compiler.loopopts.TestReductionReassociationFuzzer unroll
+ * @run driver compiler.loopopts.TestReductionReassociationFuzzer no-superword
  */
 
 package compiler.loopopts;
@@ -75,9 +75,8 @@ public class TestReductionReassociationFuzzer {
         long t2 = System.nanoTime();
 
         String[] flags = switch(args[0]) {
-            case "vanilla" -> new String[] {"-XX:-UseSuperWord", "-XX:LoopMaxUnroll=0"};
-            case "unroll" -> new String[] {"-XX:-UseSuperWord"};
-            // case "random-flags" -> randomFlags();
+            case "vanilla" -> new String[] {};
+            case "no-superword" -> new String[] {"-XX:-UseSuperWord"};
             default -> throw new RuntimeException("unknown run id=" + args[0]);
         };
         // Run the tests without any additional VM flags.
