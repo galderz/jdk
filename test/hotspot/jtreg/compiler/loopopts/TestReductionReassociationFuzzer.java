@@ -99,9 +99,9 @@ public class TestReductionReassociationFuzzer {
             testTemplateTokens.add(TestGenerator.make(factor, ManualUnroll.Naive).generate());
         }
 
-//        for(int factor : List.of(1, 2)) {
-//            testTemplateTokens.add(TestGenerator.make(factor, ManualUnroll.BasicReassoc).generate());
-//        }
+        for(int factor : List.of(1, 2, 4, 8, 16)) {
+            testTemplateTokens.add(TestGenerator.make(factor, ManualUnroll.BasicReassoc).generate());
+        }
 
         // Create the test class, which runs all testTemplateTokens.
         return TestFrameworkClass.render(

@@ -4994,6 +4994,12 @@ static void try_reassociate(PhiNode* phi, IdealLoopTree* lpt, PhaseIdealLoop* ph
         // Only interested in commutative add nodes that are in use in the loop
         return;
       }
+      if (use->in(1)->Opcode() == Op_MaxL && use->in(2)->Opcode() == Op_MaxL){
+        // A chain to reassociate cannot be constructed
+        // when the chain can have multiple paths
+        return;
+      }
+
       chain_length++;
       chain_head = use;
     }
