@@ -4949,7 +4949,7 @@ bool PhaseIdealLoop::process_expensive_nodes() {
   return progress;
 }
 
-static Node* reassociate(int depth, Node** chain_cursor, Node* loop_head, PhaseIdealLoop* phase) {
+static Node* reassociate_chain(int depth, Node** chain_cursor, Node* loop_head, PhaseIdealLoop* phase) {
   if (depth == 1) {
     Node* node = *chain_cursor;
     if (node->Opcode() == Op_MaxL) {
@@ -4968,15 +4968,15 @@ static Node* reassociate(int depth, Node** chain_cursor, Node* loop_head, PhaseI
 
   int left_depth = depth / 2;
   int right_depth = depth - left_depth;
-  Node* left = reassociate(left_depth, chain_cursor, loop_head, phase);
-  Node* right = reassociate(right_depth, chain_cursor, loop_head, phase);
+  Node* left = reassociate_chain(left_depth, chain_cursor, loop_head, phase);
+  Node* right = reassociate_chain(right_depth, chain_cursor, loop_head, phase);
 
   Node* node = new MaxLNode(phase->C, left, right);
   phase->register_new_node(node, loop_head);
   return node;
 }
 
-static void try_reassociate(PhiNode* phi, IdealLoopTree* lpt, PhaseIdealLoop* phase) {
+static void try_reassociate_chain(PhiNode* phi, IdealLoopTree* lpt, PhaseIdealLoop* phase) {
   Node* chain_head = nullptr;
   Node* current = phi;
   int chain_length = 0;
@@ -5025,7 +5025,7 @@ static void try_reassociate(PhiNode* phi, IdealLoopTree* lpt, PhaseIdealLoop* ph
 
   Node* chain_cursor = chain_head;
   Node* loop_head = lpt->head();
-  Node* reassociated = reassociate(chain_length, &chain_cursor, loop_head, phase);
+  Node* reassociated = reassociate_chain(chain_length, &chain_cursor, loop_head, phase);
 
   Node* new_chain_head = new MaxLNode(phase->C, phi, reassociated);
   phase->register_new_node(new_chain_head, loop_head);
@@ -5419,25 +5419,8 @@ void PhaseIdealLoop::build_and_optimize() {
         for (DUIterator_Fast imax, i = loop_head->fast_outs(imax); i < imax; i++) {
           Node* loop_head_use = loop_head->fast_out(i);
           if (loop_head_use->is_Phi()) {
-            // tty->print("[avoid-cmov] loop head:");
-            // loop_head->dump();
-            try_reassociate(loop_head_use->as_Phi(), lpt, this);
+            try_reassociate_chain(loop_head_use->as_Phi(), lpt, this);
           }
-
-          // // Only Phi with one out
-          // if (loop_head_use->is_Phi() && loop_head_use->outcnt() == 1) {
-          //   Node* phi_use = loop_head_use->find_out_with(Op_MaxL);
-          //   if (phi_use != nullptr) {
-          //     try_reassociate(loop_head_use, phi_use, lpt, this);
-          //   }
-          //   // Node* phi_use = loop_head_use->out()
-          //   // for (uint i = 1; i < loop_head_use->len(); i++) {
-          //   //   Node* phi_input = loop_head_use->in(i);
-          //   //   if (phi_input->Opcode() == Op_MaxL) {
-          //   //     try_reassociate(loop_head_use, phi_input, lpt, this);
-          //   //   }
-          //   // }
-          // }
         }
       }
     }
