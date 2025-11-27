@@ -4977,10 +4977,7 @@ static Node* reassociate(int depth, Node** chain_cursor, Node* loop_head, PhaseI
 }
 
 static void try_reassociate(PhiNode* phi, IdealLoopTree* lpt, PhaseIdealLoop* phase) {
-  // tty->print("[avoid-cmov] uses:  ");
-  // phi_use->dump();
-
-  Node* chain_head;
+  Node* chain_head = nullptr;
   Node* current = phi;
   int chain_length = 0;
   while (current != nullptr) {
@@ -5026,10 +5023,9 @@ static void try_reassociate(PhiNode* phi, IdealLoopTree* lpt, PhaseIdealLoop* ph
   // tty->print("[avoid-cmov] try reassociate; chain head:\n");
   // chain_head->dump();
 
-  Node* chain_head_copy = chain_head;
-  Node** chain_cursor = &chain_head_copy;
+  Node* chain_cursor = chain_head;
   Node* loop_head = lpt->head();
-  Node* reassociated = reassociate(chain_length, chain_cursor, loop_head, phase);
+  Node* reassociated = reassociate(chain_length, &chain_cursor, loop_head, phase);
 
   Node* new_chain_head = new MaxLNode(phase->C, phi, reassociated);
   phase->register_new_node(new_chain_head, loop_head);
