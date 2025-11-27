@@ -4949,20 +4949,20 @@ bool PhaseIdealLoop::process_expensive_nodes() {
   return progress;
 }
 
-static Node* reassociate(int depth, Node* chain_cursor[], Node* loop_head, PhaseIdealLoop* phase) {
+static Node* reassociate(int depth, Node** chain_cursor, Node* loop_head, PhaseIdealLoop* phase) {
   if (depth == 1) {
-    Node* node = chain_cursor[0];
+    Node* node = *chain_cursor;
     if (node->Opcode() == Op_MaxL) {
       Node* left = node->in(1);
       Node* right = node->in(2);
       if (left->Opcode() == Op_MaxL || left->is_Phi()) {
-        chain_cursor[0] = left;
+        *chain_cursor = left;
         return right;
       }
-      chain_cursor[0] = right;
+      *chain_cursor = right;
       return left;
     }
-    chain_cursor[0] = nullptr;
+    *chain_cursor = nullptr;
     return node;
   }
 
@@ -5026,13 +5026,14 @@ static void try_reassociate(PhiNode* phi, IdealLoopTree* lpt, PhaseIdealLoop* ph
   // tty->print("[avoid-cmov] try reassociate; chain head:\n");
   // chain_head->dump();
 
-  Node* chain_cursor[1] = {chain_head};
+  Node* chain_head_copy = chain_head;
+  Node** chain_cursor = &chain_head_copy;
   Node* loop_head = lpt->head();
   Node* reassociated = reassociate(chain_length, chain_cursor, loop_head, phase);
 
-  Node* new_chain_root = new MaxLNode(phase->C, phi, reassociated);
-  phase->register_new_node(new_chain_root, loop_head);
-  phase->igvn().replace_node(chain_head, new_chain_root);
+  Node* new_chain_head = new MaxLNode(phase->C, phi, reassociated);
+  phase->register_new_node(new_chain_head, loop_head);
+  phase->igvn().replace_node(chain_head, new_chain_head);
 }
 
 //=============================================================================
