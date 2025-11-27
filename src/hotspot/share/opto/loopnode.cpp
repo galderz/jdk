@@ -4949,27 +4949,23 @@ bool PhaseIdealLoop::process_expensive_nodes() {
   return progress;
 }
 
-static Node* reassociate_chain(int depth, Node** chain_cursor, Node* loop_head, PhaseIdealLoop* phase) {
+static Node* reassociate_chain(int depth, Node** chain_cursor, PhiNode* phi, Node* loop_head, PhaseIdealLoop* phase) {
   if (depth == 1) {
     Node* node = *chain_cursor;
-    if (node->Opcode() == Op_MaxL) {
-      Node* left = node->in(1);
-      Node* right = node->in(2);
-      if (left->Opcode() == Op_MaxL || left->is_Phi()) {
-        *chain_cursor = left;
-        return right;
-      }
-      *chain_cursor = right;
-      return left;
+    Node* left = node->in(1);
+    Node* right = node->in(2);
+    if (left == phi || left->Opcode() == Op_MaxL) {
+      *chain_cursor = left;
+      return right;
     }
-    *chain_cursor = nullptr;
-    return node;
+    *chain_cursor = right;
+    return left;
   }
 
   int left_depth = depth / 2;
   int right_depth = depth - left_depth;
-  Node* left = reassociate_chain(left_depth, chain_cursor, loop_head, phase);
-  Node* right = reassociate_chain(right_depth, chain_cursor, loop_head, phase);
+  Node* left = reassociate_chain(left_depth, chain_cursor, phi, loop_head, phase);
+  Node* right = reassociate_chain(right_depth, chain_cursor, phi, loop_head, phase);
 
   Node* node = new MaxLNode(phase->C, left, right);
   phase->register_new_node(node, loop_head);
@@ -5025,7 +5021,7 @@ static void try_reassociate_chain(PhiNode* phi, IdealLoopTree* lpt, PhaseIdealLo
 
   Node* chain_cursor = chain_head;
   Node* loop_head = lpt->head();
-  Node* reassociated = reassociate_chain(chain_length, &chain_cursor, loop_head, phase);
+  Node* reassociated = reassociate_chain(chain_length, &chain_cursor, phi, loop_head, phase);
 
   Node* new_chain_head = new MaxLNode(phase->C, phi, reassociated);
   phase->register_new_node(new_chain_head, loop_head);
