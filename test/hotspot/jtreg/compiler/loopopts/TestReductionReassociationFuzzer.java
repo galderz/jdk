@@ -114,7 +114,6 @@ public class TestReductionReassociationFuzzer {
             // List of imports.
             Set.of("compiler.lib.generators.*",
                 "compiler.lib.verify.*",
-                "java.lang.foreign.*",
                 "java.util.Random",
                 "jdk.test.lib.Utils"),
             // classpath, so the Test VM has access to the compiled class files.
