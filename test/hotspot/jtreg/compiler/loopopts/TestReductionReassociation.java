@@ -31,108 +31,240 @@
 
 package compiler.loopopts;
 
+import compiler.lib.compile_framework.CompileFramework;
 import compiler.lib.generators.Generator;
 import compiler.lib.ir_framework.*;
+import compiler.lib.template_framework.Template;
+import compiler.lib.template_framework.TemplateToken;
+import compiler.lib.template_framework.library.CodeGenerationDataNameType;
+import compiler.lib.template_framework.library.PrimitiveType;
+import compiler.lib.template_framework.library.TestFrameworkClass;
 import compiler.lib.verify.Verify;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Set;
+import java.util.stream.IntStream;
+
 import static compiler.lib.generators.Generators.G;
+import static compiler.lib.template_framework.Template.*;
+import static compiler.lib.template_framework.Template.let;
 
 public class TestReductionReassociation {
-    static final Generator<Long> GEN_L = G.longs();
-
-    static final long[] aL = new long[10_000];
-
-    final Object[] gold = test();
-
-    static {
-        G.fill(GEN_L, aL);
-    }
-
-    public static void main(String[] args) {
-        TestFramework.runWithFlags("-XX:-UseSuperWord", "-XX:LoopMaxUnroll=0");
-    }
-
-    @Test
-    @IR(counts = {IRNode.MAX_L, "= 4"}, phase = CompilePhase.AFTER_LOOP_OPTS)
-    public Object[] test() {
-        long result = Integer.MIN_VALUE;
-        long result2 = Integer.MIN_VALUE;
-        for (int i = 0; i < aL.length; i += 4) {
-            long v0 = aL[i + 0];
-            long v1 = aL[i + 1];
-            long v2 = aL[i + 2];
-            long v3 = aL[i + 3];
-
-            // result = max(v3, max(v2, max(v1, max(v0, result))))
-            long u0 = Math.max(v0, result);
-            long u1 = Math.max(v1, u0);
-            long u2 = Math.max(v2, u1);
-            long u3 = Math.max(v3, u2);
-            result = u3;
-
-            // result2 = max(result, max(max(v0, v1), max(v2, v3))
-            long t0 = Math.max(v0, v1);
-            long t1 = Math.max(v2, v3);
-            long t2 = Math.max(t0, t1);
-            long t3 = Math.max(result, t2);
-            result2 = t3;
-        }
-
-        return new Object[]{result, result2};
-    }
-
-    // max(result, max(max(v3, v2), max(v1, v0))
-    // long t0 = Math.max(v3, v2);
-    // long t1 = Math.max(v1, v0);
-    // long t2 = Math.max(t0, t1);
-    // long t3 = Math.max(resultReassocTree, t2);
-    // resultReassocTree = t3;
-
-//    @Test
-//    @IR(counts = {IRNode.MAX_L, "= 4"}, phase = CompilePhase.BEFORE_MACRO_EXPANSION)
-//    public Object[] test() {
-//        // result = max(v3, max(v2, max(v1, max(v0, result))))
-//        long resultUnroll = Integer.MIN_VALUE;
-//        for (int i = 0; i < aL.length; i += 4) {
-//            var v0 = aL[i + 0];
-//            var v1 = aL[i + 1];
-//            var v2 = aL[i + 2];
-//            var v3 = aL[i + 3];
-//            var t0 = Math.max(v0, resultUnroll);
-//            var t1 = Math.max(v1, t0);
-//            var t2 = Math.max(v2, t1);
-//            var t3 = Math.max(v3, t2);
-//            resultUnroll = t3;
-//        }
+//    static final Generator<Long> GEN_L = G.longs();
 //
-//        // result = max(result, max(max(v0, v1), max(v2, v3))
-//        long resultReassocTree = Integer.MIN_VALUE;
-//        for (int i = 0; i < aL.length; i += 4) {
-//            var v0 = aL[i + 0];
-//            var v1 = aL[i + 1];
-//            var v2 = aL[i + 2];
-//            var v3 = aL[i + 3];
-//            var t0 = Math.max(v0, v1);
-//            var t1 = Math.max(v2, v3);
-//            var t2 = Math.max(t0, t1);
-//            resultReassocTree = Math.max(resultReassocTree, t2);
-//        }
+//    static final long[] aL = new long[10_000];
 //
-//        return new Object[]{resultUnroll, resultReassocTree};
-//        // i = max(a, max(b, max(c, max(d, i)))
-//        // i' = max(i, max(max(a, b), max(c, d)))
-//        // to
-//        // i = max(i, max(max(a, b), max(c, d)))
-//        // i' = max(i, max(max(a, b), max(c, d)))
-//        // =
-//        // i = max(i, max(max(a, b), max(c, d)))
-//        // i' = i
+//    final Object[] gold = test();
+//
+//    static {
+//        G.fill(GEN_L, aL);
 //    }
 
-    @Check(test = "test")
-    public void check(Object[] vals) {
-        Verify.checkEQ(gold[0], vals[0]);
-        Verify.checkEQ(gold[1], vals[1]);
-        Verify.checkEQ(vals[0], vals[1]);
+//    public static void main(String[] args) {
+//        TestFramework.runWithFlags("-XX:-UseSuperWord", "-XX:LoopMaxUnroll=0");
+//    }
+//
+//    @Test
+//    @IR(counts = {IRNode.MAX_L, "= 4"}, phase = CompilePhase.AFTER_LOOP_OPTS)
+//    public Object[] test() {
+//        long result = Integer.MIN_VALUE;
+//        long result2 = Integer.MIN_VALUE;
+//        for (int i = 0; i < aL.length; i += 4) {
+//            long v0 = aL[i + 0];
+//            long v1 = aL[i + 1];
+//            long v2 = aL[i + 2];
+//            long v3 = aL[i + 3];
+//
+//            // result = max(v3, max(v2, max(v1, max(v0, result))))
+//            long u0 = Math.max(v0, result);
+//            long u1 = Math.max(v1, u0);
+//            long u2 = Math.max(v2, u1);
+//            long u3 = Math.max(v3, u2);
+//            result = u3;
+//
+//            // result2 = max(result, max(max(v0, v1), max(v2, v3))
+//            long t0 = Math.max(v0, v1);
+//            long t1 = Math.max(v2, v3);
+//            long t2 = Math.max(t0, t1);
+//            long t3 = Math.max(result, t2);
+//            result2 = t3;
+//        }
+//
+//        return new Object[]{result, result2};
+//    }
+//
+//    @Check(test = "test")
+//    public void check(Object[] vals) {
+//        Verify.checkEQ(gold[0], vals[0]);
+//        Verify.checkEQ(gold[1], vals[1]);
+//        Verify.checkEQ(vals[0], vals[1]);
+//    }
+
+    public static void main(String[] args) {
+        // Create a new CompileFramework instance.
+        CompileFramework comp = new CompileFramework();
+
+        // Add a java source file.
+        comp.addJavaSourceCode("compiler.loopopts.templated.ReductionReassociation", generate(comp));
+
+        // Compile the source file.
+        comp.compile();
+
+        String[] flags = new String[] {"-XX:-UseSuperWord", "-XX:LoopMaxUnroll=0", "-XX:VerifyIterativeGVN=1000"};
+        comp.invoke("compiler.loopopts.templated.ReductionReassociation", "main", new Object[] {flags});
+    }
+
+    public static String generate(CompileFramework comp) {
+        List<TemplateToken> testTemplateTokens = new ArrayList<>();
+
+        final int size = 10_000;
+
+        testTemplateTokens.add(new TestGenerator(AddOp.MAX_L, size).generate());
+
+        // Create the test class, which runs all testTemplateTokens.
+        return TestFrameworkClass.render(
+            // package and class name.
+            "compiler.loopopts.templated", "ReductionReassociation",
+            // List of imports.
+            Set.of("compiler.lib.generators.*",
+                "compiler.lib.verify.*"),
+            // classpath, so the Test VM has access to the compiled class files.
+            comp.getEscapedClassPathOfCompiledClasses(),
+            // The list of tests.
+            testTemplateTokens);
+    }
+
+    enum AddOp {
+        MAX_L(CodeGenerationDataNameType.longs());
+
+        final PrimitiveType type;
+
+        AddOp(PrimitiveType type) {
+            this.type = type;
+        }
+    }
+
+    record TestGenerator(AddOp add, int size) {
+        public TemplateToken generate() {
+            final String id = add.toString();
+            var testTemplate = Template.make(() -> {
+                String test = $("test_" + id);
+                String input = $("input_" + id);
+                String expected = $("expected_" + id);
+                String setup = $("setup_" + id);
+                String check = $("check_" + id);
+                return scope(
+                    """
+                    // --- $test start ---
+
+                    """,
+                    generateArrayField(input),
+                    generateExpectedField(test, expected),
+                    // generateSetup(setup, input),
+                    generateTest(input, setup, test),
+                    generateCheck(test, check, expected),
+                    """
+
+                    // --- $test end ---
+                    """
+                );
+            });
+            return testTemplate.asToken();
+        }
+
+        private TemplateToken generateCheck(String test, String check, String expected) {
+            var template = Template.make(() -> scope(
+                let("test", test),
+                let("check", check),
+                let("expected", expected),
+                """
+                @Check(test = "#test")
+                public void #check(Object[] results) {
+                    Verify.checkEQ(#expected[0], results[0]);
+                    Verify.checkEQ(#expected[1], results[1]);
+                    Verify.checkEQ(results[0], results[1]);
+                }
+                """
+            ));
+            return template.asToken();
+        }
+
+        private TemplateToken generateOp(String a, String b) {
+            var template = Template.make(() -> scope(
+                let("a", a),
+                let("b", b),
+                switch (add) {
+                    case MAX_L -> "Math.max(#a, #b)";
+                }
+            ));
+            return template.asToken();
+        }
+
+        private TemplateToken generateTest(String input, String setup, String test) {
+            var template = Template.make(() -> scope(
+                let("irNodeName", add.name()),
+                let("input", input),
+                let("setup", setup),
+                let("test", test),
+                let("type", add.type.name()),
+                """
+                @Test
+                @IR(counts = {IRNode.#irNodeName, "= 4"}, phase = CompilePhase.AFTER_LOOP_OPTS)
+                public Object[] #test() {
+                    #type result = Integer.MIN_VALUE;
+                    #type result2 = Integer.MIN_VALUE;
+                    for (int i = 0; i < #input.length; i += 4) {
+                        long v0 = #input[i + 0];
+                        long v1 = #input[i + 1];
+                        long v2 = #input[i + 2];
+                        long v3 = #input[i + 3];
+                """,
+                "long u0 = ", generateOp("v0", "result"), ";",
+                "long u1 = ", generateOp("v1", "u0"), ";",
+                "long u2 = ", generateOp("v2", "u1"), ";",
+                "long u3 = ", generateOp("v3", "u2"), ";",
+                "result = u3;",
+                "long t0 = ", generateOp("v0", "v1"), ";",
+                "long t1 = ", generateOp("v2", "v3"), ";",
+                "long t2 = ", generateOp("t0", "t1"), ";",
+                "long t3 = ", generateOp("result", "t2"), ";",
+                "result2 = t3;",
+                """
+                    }
+                    return new Object[]{result, result2};
+                }
+                """
+            ));
+            return template.asToken();
+        }
+
+        private TemplateToken generateExpectedField(String test, String expected) {
+            var template = Template.make(() -> scope(
+                let("size", size),
+                let("test", test),
+                let("expected", expected),
+                """
+                private Object[] #expected = #test();
+                """
+            ));
+            return template.asToken();
+        }
+
+        private TemplateToken generateArrayField(String input) {
+            var template = Template.make(() -> scope(
+                let("size", size),
+                let("input", input),
+                let("type", add.type.name()),
+                let("gen", add.type.name() + "s"),
+                """
+                private static #type[] #input = new #type[#size];
+                static {
+                    Generators.G.fill(Generators.G.#gen(), #input);
+                }
+                """
+            ));
+            return template.asToken();
+        }
     }
 }
