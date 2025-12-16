@@ -5026,6 +5026,10 @@ static void try_reassociate_chain(PhiNode* phi, IdealLoopTree* lpt, PhaseIdealLo
   Node* new_chain_head = new MaxLNode(phase->C, phi, reassociated);
   phase->register_new_node(new_chain_head, loop_head);
   phase->igvn().replace_node(chain_head, new_chain_head);
+
+  // tty->print("[avoid-cmov] try reassociate; new chain head:\n");
+  // new_chain_head->dump();
+  // tty->print("[avoid-cmov] try reassociate; end\n");
 }
 
 //=============================================================================
