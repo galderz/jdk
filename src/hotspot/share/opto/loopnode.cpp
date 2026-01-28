@@ -5486,7 +5486,7 @@ void PhaseIdealLoop::build_and_optimize() {
     C->set_major_progress();
   }
 
-  if (!C->major_progress()) {
+  if (!C->major_progress() && UseNewCode) {
     for (LoopTreeIterator iter(_ltree_root); !iter.done(); iter.next()) {
       IdealLoopTree* lpt = iter.current();
       if (lpt->is_innermost()) {
