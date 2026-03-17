@@ -24,6 +24,7 @@
 package compiler.loopopts.superword;
 
 import compiler.lib.ir_framework.*;
+import compiler.lib.verify.Verify;
 import jdk.test.lib.Utils;
 import jdk.test.whitebox.WhiteBox;
 import java.lang.foreign.MemorySegment;
@@ -183,7 +184,7 @@ public class TestCompatibleUseDefTypeSize {
             // Compute new result
             Object[] result = test.run();
             // Compare gold and new result
-            verify(name, gold, result);
+            Verify.checkEQ(gold, result);
         }
     }
 
@@ -269,141 +270,6 @@ public class TestCompatibleUseDefTypeSize {
         MemorySegment dst = generateMemorySegmentD();
         MemorySegment.copy(src, 0, dst, 0, src.byteSize());
         return dst;
-    }
-
-    static void verify(String name, Object[] gold, Object[] result) {
-        if (gold.length != result.length) {
-            throw new RuntimeException("verify " + name + ": not the same number of outputs: gold.length = " +
-                                       gold.length + ", result.length = " + result.length);
-        }
-        for (int i = 0; i < gold.length; i++) {
-            Object g = gold[i];
-            Object r = result[i];
-            if (g.getClass() != r.getClass()) {
-                throw new RuntimeException("verify " + name + ": must both be array of same type:" +
-                                           " gold[" + i + "].getClass() = " + g.getClass().getSimpleName() +
-                                           " result[" + i + "].getClass() = " + r.getClass().getSimpleName());
-            }
-            if (g == r) {
-                throw new RuntimeException("verify " + name + ": should be two separate arrays (with identical content):" +
-                                           " gold[" + i + "] == result[" + i + "]");
-            }
-            if (g.getClass().isArray() && Array.getLength(g) != Array.getLength(r)) {
-                    throw new RuntimeException("verify " + name + ": arrays must have same length:" +
-                                           " gold[" + i + "].length = " + Array.getLength(g) +
-                                           " result[" + i + "].length = " + Array.getLength(r));
-            }
-            Class c = g.getClass().getComponentType();
-            if (c == byte.class) {
-                verifyB(name, i, (byte[])g, (byte[])r);
-            } else if (c == short.class) {
-                verifyS(name, i, (short[])g, (short[])r);
-            } else if (c == char.class) {
-                verifyC(name, i, (char[])g, (char[])r);
-            } else if (c == int.class) {
-                verifyI(name, i, (int[])g, (int[])r);
-            } else if (c == long.class) {
-                verifyL(name, i, (long[])g, (long[])r);
-            } else if (c == float.class) {
-                verifyF(name, i, (float[])g, (float[])r);
-            } else if (c == double.class) {
-                verifyD(name, i, (double[])g, (double[])r);
-            } else if (MemorySegment.class.isAssignableFrom(g.getClass())) {
-                verifyMemorySegment(name, i, (MemorySegment) g, (MemorySegment) r);
-            } else {
-                throw new RuntimeException("verify " + name + ": array type not supported for verify:" +
-                                       " gold[" + i + "].getClass() = " + g.getClass().getSimpleName() +
-                                       " result[" + i + "].getClass() = " + r.getClass().getSimpleName());
-            }
-        }
-    }
-
-    static void verifyB(String name, int i, byte[] g, byte[] r) {
-        for (int j = 0; j < g.length; j++) {
-            if (g[j] != r[j]) {
-                throw new RuntimeException("verify " + name + ": arrays must have same content:" +
-                                           " gold[" + i + "][" + j + "] = " + g[j] +
-                                           " result[" + i + "][" + j + "] = " + r[j]);
-            }
-        }
-    }
-
-    static void verifyS(String name, int i, short[] g, short[] r) {
-        for (int j = 0; j < g.length; j++) {
-            if (g[j] != r[j]) {
-                throw new RuntimeException("verify " + name + ": arrays must have same content:" +
-                                           " gold[" + i + "][" + j + "] = " + g[j] +
-                                           " result[" + i + "][" + j + "] = " + r[j]);
-            }
-        }
-    }
-
-    static void verifyC(String name, int i, char[] g, char[] r) {
-        for (int j = 0; j < g.length; j++) {
-            if (g[j] != r[j]) {
-                throw new RuntimeException("verify " + name + ": arrays must have same content:" +
-                                           " gold[" + i + "][" + j + "] = " + g[j] +
-                                           " result[" + i + "][" + j + "] = " + r[j]);
-            }
-        }
-    }
-
-    static void verifyI(String name, int i, int[] g, int[] r) {
-        for (int j = 0; j < g.length; j++) {
-            if (g[j] != r[j]) {
-                throw new RuntimeException("verify " + name + ": arrays must have same content:" +
-                                           " gold[" + i + "][" + j + "] = " + g[j] +
-                                           " result[" + i + "][" + j + "] = " + r[j]);
-            }
-        }
-    }
-
-    static void verifyL(String name, int i, long[] g, long[] r) {
-        for (int j = 0; j < g.length; j++) {
-            if (g[j] != r[j]) {
-                throw new RuntimeException("verify " + name + ": arrays must have same content:" +
-                                           " gold[" + i + "][" + j + "] = " + g[j] +
-                                           " result[" + i + "][" + j + "] = " + r[j]);
-            }
-        }
-    }
-
-    static void verifyF(String name, int i, float[] g, float[] r) {
-        for (int j = 0; j < g.length; j++) {
-            if (Float.floatToIntBits(g[j]) != Float.floatToIntBits(r[j])) {
-                throw new RuntimeException("verify " + name + ": arrays must have same content:" +
-                                           " gold[" + i + "][" + j + "] = " + g[j] +
-                                           " result[" + i + "][" + j + "] = " + r[j]);
-            }
-        }
-    }
-
-    static void verifyD(String name, int i, double[] g, double[] r) {
-        for (int j = 0; j < g.length; j++) {
-            if (Double.doubleToLongBits(g[j]) != Double.doubleToLongBits(r[j])) {
-                throw new RuntimeException("verify " + name + ": arrays must have same content:" +
-                                           " gold[" + i + "][" + j + "] = " + g[j] +
-                                           " result[" + i + "][" + j + "] = " + r[j]);
-            }
-        }
-    }
-
-    static void verifyMemorySegment(String name, int i, MemorySegment g, MemorySegment r) {
-        if (g.byteSize() != r.byteSize()) {
-            throw new RuntimeException("verify " + name + ": MemorySegment must have same byteSize:" +
-                " gold[" + i + "].byteSize = " + g.byteSize() +
-                " result[" + i + "].byteSize = " + r.byteSize());
-        }
-
-        for (int j = 0; j < (int) g.byteSize(); j++) {
-            byte vg = g.get(ValueLayout.JAVA_BYTE, j);
-            byte vr = r.get(ValueLayout.JAVA_BYTE, j);
-            if (vg != vr) {
-                throw new RuntimeException("verify " + name + ": MemorySegment must have same content:" +
-                    " gold[" + i + "][" + j + "] = " + vg +
-                    " result[" + i + "][" + j + "] = " + vr);
-            }
-        }
     }
 
     @Test
