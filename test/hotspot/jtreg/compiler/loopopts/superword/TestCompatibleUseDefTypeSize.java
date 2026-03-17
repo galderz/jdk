@@ -640,6 +640,7 @@ public class TestCompatibleUseDefTypeSize {
     @IR(counts = {IRNode.LOAD_VECTOR_F, IRNode.VECTOR_SIZE + "min(max_int, max_float)", "> 0",
                   IRNode.STORE_VECTOR, "> 0",
                   IRNode.VECTOR_REINTERPRET, "> 0"},
+        applyIf = {"AlignVector", "false"},
         applyIfPlatform = {"64-bit", "true"},
         applyIfCPUFeatureOr = {"sse4.1", "true", "asimd", "true", "rvv", "true"})
     static Object[] testFloatToIntMemorySegment(MemorySegment a, float[] b) {
@@ -654,6 +655,7 @@ public class TestCompatibleUseDefTypeSize {
     @IR(counts = {IRNode.LOAD_VECTOR_D, IRNode.VECTOR_SIZE + "min(max_long, max_double)", "> 0",
                   IRNode.STORE_VECTOR, "> 0",
                   IRNode.VECTOR_REINTERPRET, "> 0"},
+        applyIf = {"AlignVector", "false"},
         applyIfPlatform = {"64-bit", "true"},
         applyIfCPUFeatureOr = {"sse4.1", "true", "asimd", "true", "rvv", "true"})
     static Object[] testDoubleToLongMemorySegment(MemorySegment a, double[] b) {
@@ -668,6 +670,7 @@ public class TestCompatibleUseDefTypeSize {
     @IR(counts = {IRNode.LOAD_VECTOR_I, "> 0",
                   IRNode.STORE_VECTOR, "> 0",
                   IRNode.VECTOR_REINTERPRET, "> 0"},
+        applyIf = {"AlignVector", "false"},
         applyIfPlatform = {"64-bit", "true"},
         applyIfCPUFeatureOr = {"sse4.1", "true", "asimd", "true", "rvv", "true"})
     static Object[] testIntToFloatMemorySegment(MemorySegment a, float[] b) {
@@ -682,6 +685,7 @@ public class TestCompatibleUseDefTypeSize {
     @IR(counts = {IRNode.LOAD_VECTOR_L, "> 0",
                   IRNode.STORE_VECTOR, "> 0",
                   IRNode.VECTOR_REINTERPRET, "> 0"},
+        applyIf = {"AlignVector", "false"},
         applyIfPlatform = {"64-bit", "true"},
         applyIfCPUFeatureOr = {"sse4.1", "true", "asimd", "true", "rvv", "true"})
     static Object[] testLongToDoubleMemorySegment(MemorySegment a, double[] b) {
