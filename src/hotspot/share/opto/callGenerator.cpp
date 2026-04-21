@@ -1082,29 +1082,6 @@ JVMState* PredictedCallGenerator::generate(JVMState* jvms) {
     return kit.transfer_exceptions_into_jvms();
   }
 
-  // Allocate inline types if they are merged with objects (similar to Parse::merge_common())
-  uint tos = kit.jvms()->stkoff() + kit.sp();
-  uint limit = slow_map->req();
-  for (uint i = TypeFunc::Parms; i < limit; i++) {
-    Node* m = kit.map()->in(i);
-    Node* n = slow_map->in(i);
-    const Type* t = gvn.type(m)->meet_speculative(gvn.type(n));
-    // TODO 8284443 still needed?
-    if (m->is_InlineType() && !t->is_inlinetypeptr()) {
-      // Allocate inline type in fast path
-      m = m->as_InlineType()->buffer(&kit);
-      kit.map()->set_req(i, m);
-    }
-    if (n->is_InlineType() && !t->is_inlinetypeptr()) {
-      // Allocate inline type in slow path
-      PreserveJVMState pjvms(&kit);
-      kit.set_map(slow_map);
-      n = n->as_InlineType()->buffer(&kit);
-      kit.map()->set_req(i, n);
-      slow_map = kit.stop();
-    }
-  }
-
   // There are 2 branches and the replaced nodes are only valid on
   // one: restore the replaced nodes to what they were before the
   // branch.
@@ -1128,6 +1105,8 @@ JVMState* PredictedCallGenerator::generate(JVMState* jvms) {
       mms.set_memory(gvn.transform(phi));
     }
   }
+  uint tos = kit.jvms()->stkoff() + kit.sp();
+  uint limit = slow_map->req();
   for (uint i = TypeFunc::Parms; i < limit; i++) {
     // Skip unused stack slots; fast forward to monoff();
     if (i == tos) {

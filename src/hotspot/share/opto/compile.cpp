@@ -806,14 +806,14 @@ Compile::Compile(ciEnv* ci_env, ciMethod* target, int osr_bci,
     // Set up tf(), start(), and find a CallGenerator.
     CallGenerator* cg = nullptr;
     if (is_osr_compilation()) {
-      init_tf(TypeFunc::make(method(), /* is_osr_compilation = */ true));
+      init_tf(TypeFunc::make(method(), false, /* is_osr_compilation = */ true));
       StartNode* s = new StartOSRNode(root(), tf()->domain_sig());
       initial_gvn()->set_type_bottom(s);
       verify_start(s);
       cg = CallGenerator::for_osr(method(), entry_bci());
     } else {
       // Normal case.
-      init_tf(TypeFunc::make(method()));
+      init_tf(TypeFunc::make(method(), false));
       StartNode* s = new StartNode(root(), tf()->domain_cc());
       initial_gvn()->set_type_bottom(s);
       verify_start(s);
@@ -912,18 +912,32 @@ Compile::Compile(ciEnv* ci_env, ciMethod* target, int osr_bci,
     env()->dump_inline_data(_compile_id);
   }
 
-  // Now that we know the size of all the monitors we can add a fixed slot
-  // for the original deopt pc.
-  int next_slot = fixed_slots() + (sizeof(address) / VMRegImpl::stack_slot_size);
+  // Now that we know the size of all the monitors we can add fixed slots:
+  // [...]
+  // rsp+80: saved fp register
+  // rsp+76: Fixed slot 7
+  // rsp+72: Fixed slot 6 (stack increment)
+  // rsp+68: Fixed slot 5
+  // rsp+64: Fixed slot 4 (null marker)
+  // rsp+60: Fixed slot 3
+  // rsp+56: Fixed slot 2 (original deopt pc)
+  // rsp+52: Fixed slot 1
+  // rsp+48: Fixed slot 0 (monitors)
+  // rsp+44: spill
+  // [...]
+
+  // One extra slot for the original deopt pc.
+  int next_slot = fixed_slots();
+  next_slot += VMRegImpl::slots_per_word;
+
+  // One extra slot for the special stack increment value.
   if (needs_stack_repair()) {
-    // One extra slot for the special stack increment value
-    next_slot += 2;
+    next_slot += VMRegImpl::slots_per_word;
   }
-  // TODO 8284443 Only reserve extra slot if needed
-  if (InlineTypeReturnedAsFields) {
-    // One extra slot to hold the null marker for a nullable
-    // inline type return if we run out of registers.
-    next_slot += 2;
+
+  // One extra slot to hold the null marker at scalarized returns.
+  if (needs_nm_slot()) {
+    next_slot += VMRegImpl::slots_per_word;
   }
   set_fixed_slots(next_slot);
 
@@ -1121,6 +1135,7 @@ void Compile::Init(bool aliasing) {
   _has_flat_accesses = false;
   _flat_accesses_share_alias = true;
   _scalarize_in_safepoints = false;
+  _needs_nm_slot = false;
 
   set_do_inlining(Inline);
   set_max_inline_size(MaxInlineSize);
@@ -2007,7 +2022,7 @@ bool Compile::clear_argument_if_only_used_as_buffer_at_calls(Node* result_cast, 
         wq.push(u);
       } else if (u->is_CallJava()) {
         CallJavaNode* call = u->as_CallJava();
-        if (call->method() != nullptr && call->method()->get_Method()->mismatch()) {
+        if (call->method() != nullptr && call->method()->mismatch()) {
           return false;
         }
         uint nargs = call->tf()->domain_cc()->cnt();
