@@ -56,11 +56,11 @@ public class MinMaxVector
         int size;
 
         /**
-         * Probability of one of the min/max branches being taken.
+         * Probability of going down one of the min/max branch sides.
          * For max, this value represents the percentage of branches in which
-         * the value will be bigger or equal than the current max.
+         * the value will be bigger than the current max.
          * For min, this value represents the percentage of branches in which
-         * the value will be smaller or equal than the current min.
+         * the value will be smaller than the current min.
          */
         @Param({"50", "80", "100"})
         int probability;
