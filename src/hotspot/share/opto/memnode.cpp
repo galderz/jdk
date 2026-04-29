@@ -2403,7 +2403,7 @@ const Type* LoadNode::Value(PhaseGVN* phase) const {
             // Default value load
             tp->is_instptr()->instance_klass() == ciEnv::current()->Class_klass() ||
             // unsafe field access may not have a constant offset
-            C->has_unsafe_access(),
+            is_unsafe_access(),
             "Field accesses must be precise" );
     // For oop loads, we expect the _type to be precise.
 
