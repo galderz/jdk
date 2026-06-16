@@ -422,14 +422,32 @@ sed -n '/Compiled method (c2).*%/,/Compiled method/p' asm_patch_byte.txt | \
     grep -n 'xorl.*# int'
 ```
 
-**Expected:**
-- **Short**: All ~17 XOR instructions are clustered in a dense block at the END
-  of the loop body (consecutive line numbers). All iteration values are computed
-  first, spilled to XMM, then XOR'd together at the end.
+**Expected with the patch:**
+- **Short**: ~16 consecutive XOR instructions clustered in a dense block
+  inside the loop body. All iteration values are computed first, spilled to
+  XMM, then XOR'd together in one burst.
 
-- **Byte**: The ~17 XOR instructions are SPREAD OUT across the loop body
-  (~10 lines apart). Each iteration's value is XOR'd immediately after being
-  computed, then its register is freed.
+- **Byte**: XOR instructions are spread out across the loop body — one XOR
+  after each iteration's computation. Each value is consumed immediately.
+
+You can see this visually by mapping instructions to single characters
+(X=XOR, M=MUL, A=ADD, n=narrowing, .=XMM move):
+
+```
+PATCH short: ...nMAMAn.n.n.nMAnMAMAnXXXXXXXX.X.X.X.X.X.X.X.X.A.n...
+                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                                     16 XORs clustered with XMM fills
+
+PATCH byte:  ...MAnXnnnMAMAnXnnnMAMAnXnnnMAMAnXnnnMAMAnXnnn...
+                  ^          ^          ^          ^
+                  XOR after each iteration = interleaved
+```
+
+**The clustering does NOT appear in the baseline.** Without reassociation,
+both methods have XOR runs of at most 3 (sequential `acc ^= val` pattern).
+The reassociation creates the long deferred chain, and the register allocator
+only defers it for short (where it can't interleave due to register pressure
+from scaled addressing).
 
 The interleaved pattern (byte) requires only ~2 GP registers for the XOR chain.
 The deferred pattern (short) requires all 16 values to be alive simultaneously,
@@ -448,8 +466,8 @@ acc = ((((acc ^ v0) ^ v1) ^ v2) ^ ... ^ v15)
 
 Each `vi` is computed and XOR'd with `acc` immediately. Only 1 extra value
 is alive at a time (the current `vi`). Register pressure is modest.
-Even so, short has ~25 XMM moves vs byte's ~8, due to the addressing mode
-constraint.
+Even so, short already has more XMM moves than byte due to the addressing
+mode constraint (verified from JMH assembly: short=11, byte=3).
 
 ### After reassociation (patch):
 
@@ -463,11 +481,20 @@ from the previous iteration), which is the intended ILP benefit. But ALL 16
 `vi` values must be computed before the inner chain can start — they all need
 to be alive simultaneously.
 
-For byte (already low pressure): 16 simultaneous values + ~13 available
-registers → manageable, 6 XMM spills.
+For byte (already low pressure): the register allocator interleaves the XOR
+chain with computation, so values are consumed immediately → 3 XMM spills.
 
-For short (already high pressure due to scaled addressing): 16 simultaneous
-values + ~12 available registers → catastrophic, 69 XMM spills.
+For short (already high pressure due to scaled addressing): the register
+allocator defers all 16 XORs to the end, so all values must be live
+simultaneously → 76 XMM spills.
+
+**Note on the standalone reproducer:** A standalone `XorRepro.java` reproducer
+was initially used but it does NOT replicate the JMH behavior. The standalone
+reproducer showed a regression for byte (not short), which is the opposite.
+This is because JMH controls the compilation context (separate fork, Blackhole,
+warmup) which changes which C2 compilation tier and mode (OSR vs standard)
+runs during measurement. Always verify findings against the actual JMH
+benchmark.
 
 ---
 
@@ -484,14 +511,17 @@ Loop counter must stay in a SEPARATE register (for the *2 scaling)
     ↓
 More coalescing failures in Chaitin-Briggs register allocator
     ↓
-More spill copies → peephole converts to leal (non-destructive add)
-    ↓
-Baseline: 25 XMM moves (short) vs 8 (byte) — already 3x worse
+Baseline: 11 XMM moves (short) vs 3 (byte) — already worse
     ↓
 Reassociation forces 16 values live simultaneously
     ↓
-Patch: 69 XMM moves (short) vs 6 (byte) — catastrophic amplification
+Register allocator DEFERS all XORs to end (can't interleave for short)
+→ 16 consecutive XORs + XMM reloads = deferred chain cluster
+    ↓
+Patch: 76 XMM moves (short) vs 3 (byte) — catastrophic amplification
 ```
+
+(Numbers verified from actual JMH assembly dumps, not standalone reproducer.)
 
 ---
 
