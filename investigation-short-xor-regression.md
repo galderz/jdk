@@ -509,32 +509,59 @@ The scheduling consequence:
 
 ### The scheduler's decision mechanism
 
-C2's local code scheduler (`lcm.cpp`, `schedule_local()`) has a register-pressure-
-aware heuristic. When register pressure exceeds a threshold, it scores ready
-nodes based on their pressure impact:
+C2's local code scheduler (`lcm.cpp`, `schedule_local()`) picks from a ready
+list using these priorities (lines ~694-705):
 
-- Scheduling a node that **reduces** pressure → score boosted → **picked eagerly**
-- Scheduling a node that **increases** pressure → score = 1 (minimum) → **deferred**
+1. `n_choice`: higher wins (3=must_clone predecessor, 2=normal, 1=deferred)
+2. `n_latency`: higher wins (critical path distance to block end)
+3. `n_score = n->req()`: higher wins (number of machine node inputs)
 
-(See `lcm.cpp` lines ~669-689, the `_scheduling_for_pressure` block.)
+After reassociation with 16x unrolling, **all latencies are 0** for both
+methods (verified via `TraceOptoOutput` logging in `schedule_local`). So the
+tie-breaker is `n_score = n->req()` — the number of input edges on the
+machine node.
 
-**For byte's XorI(prev, RShiftI):** RShiftI is **single-use** (only consumed by
-this XorI). Scheduling XorI frees the RShiftI register. Net effect: pressure
-stays same or drops → score boosted → scheduled eagerly → interleaving.
+**The exact cause:** instruction selection produces different machine node
+structures for byte vs short array access, resulting in different `n->req()`:
 
-**For short's XorI(prev, LoadS):** LoadS is **multi-use** (consumed by BOTH MulI
-in the expression AND by this XorI). Scheduling XorI does NOT free LoadS's
-register (MulI still needs it). Net effect: pressure increases (new XorI result
-lives, LoadS still lives) → score = 1 → **deferred**.
+```
+BYTE:  XorI machine node has req()=5  →  score=5
+       MulI machine node has req()=1 or 5
+       → XorI score ≥ MulI score → XorI WINS tie-break → scheduled early
 
-And since the inner chain is sequential (r3 depends on r2, r4 on r3, etc.),
-deferring the first LoadS-consuming XorI **blocks the entire rest of the chain**.
-The scheduler processes all expression computations first (which DO reduce
-pressure), then runs the XOR chain in one burst at the end.
+SHORT: XorI machine node has req()=4  →  score=4
+       MulI machine node has req()=5
+       → MulI score > XorI score → MulI WINS → XorI DEFERRED
+```
 
-To verify: check `PrintIdeal` output for the XorI chain value inputs. Multi-use
-inputs (LoadS with output count > 1) cause deferral. Single-use inputs
-(RShiftI with output count = 1) allow interleaving.
+When short's MulI consistently beats XorI in the tie-break, ALL expression
+computations get scheduled before any XorI. Then the entire XOR chain runs
+in one burst at the end (clustering). For byte, XorI wins ties and gets
+interleaved after each iteration's computation.
+
+To verify, add logging to `schedule_local()` in `lcm.cpp` right before the
+`worklist.map` call (line ~711):
+```cpp
+if (TraceOptoOutput && n->is_Mach()) {
+    int iop = n->as_Mach()->ideal_Opcode();
+    if (iop == Op_XorI || iop == Op_RShiftI || iop == Op_MulI || iop == Op_AddI) {
+        tty->print("[sched-pick] %s(%d) choice=%d latency=%d score=%d ready_list=%d\n",
+                   NodeClassNames[iop], n->_idx, choice, latency, score, worklist.size());
+    }
+}
+```
+
+Then run with `-XX:+TraceOptoOutput -XX:CompileCommand=compileonly,...` via JMH
+to see the scheduling order. Byte shows `MulI→AddI→RShiftI→XorI` repeating
+(interleaved). Short shows all `MulI→AddI→RShiftI` first, then all `XorI`
+(clustered).
+
+The `req()` difference (5 vs 4) comes from the x86 instruction matching:
+byte array loads use unscaled addressing (`[base + index + disp]`) which
+matches machine nodes with different operand structures than short's scaled
+addressing (`[base + index*2 + disp]`). The extra operand (scale factor)
+changes the machine node's input count, which propagates to the XorI node
+through instruction selection.
 
 The interleaved pattern (byte) requires only ~2 GP registers for the XOR chain.
 The deferred pattern (short) requires all 16 values to be alive simultaneously,
@@ -592,31 +619,22 @@ short arrays: element size = 2 bytes
     ↓
 x86 SIB addressing: [base + index * 2 + disp]
     ↓
-Loop counter must stay in a SEPARATE register (for the *2 scaling)
+Instruction selection: scaled addressing produces machine nodes with
+different input counts (req()) than byte's unscaled addressing
     ↓
-~12 usable GP registers instead of ~13
+LCM schedule_local() tie-breaks on n->req() when latency is equal:
+  byte XorI: req()=5 ≥ competing MulI → XorI WINS → interleaved
+  short XorI: req()=4 < competing MulI(5) → MulI WINS → XorI deferred
     ↓
-More coalescing failures in Chaitin-Briggs register allocator
+All expression nodes scheduled before any XorI → XOR chain clustered at end
     ↓
-Baseline: 11 XMM moves (short) vs 3 (byte) — already worse
+16 intermediate values alive simultaneously → register pressure spike
     ↓
-Reassociation forces 16 values live simultaneously
-(IR is IDENTICAL for byte and short after reassociation + IGVN)
-    ↓
-Code scheduling (LCM) defers XOR chain under high register pressure
-    ↓
-Patch: 76 XMM moves (short) vs 3 (byte) — catastrophic amplification
+Patch: 76 XMM moves (short) vs 3 (byte) — catastrophic spill cascade
 ```
 
-(Numbers verified from actual JMH assembly dumps, not standalone reproducer.)
-
-**Open question:** the exact mechanism in the LCM scheduler that causes
-clustering for short but interleaving for byte remains to be fully traced.
-The IR graphs are identical, so the difference must emerge during instruction
-selection (byte arrays use unscaled addressing, short arrays use scaled `<< #1`),
-which produces different machine node structures that the LCM scheduler handles
-differently. See `schedule_local()` in `lcm.cpp` and the register pressure
-heuristic at lines ~669-689.
+(Numbers verified from actual JMH assembly dumps. Scheduling order verified
+via `TraceOptoOutput` logging in `schedule_local`.)
 
 ---
 

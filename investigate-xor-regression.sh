@@ -303,9 +303,35 @@ for bench in ['shortXorBig', 'byteXorBig']:
 print("  NOTE: PrintIdeal outputs MULTIPLE compilations with overlapping node IDs.")
 print("  This analysis uses only the FIRST compilation to avoid confusion.")
 print("  If both methods show all-RShiftI chain inputs, the IR is identical —")
-print("  the clustering difference emerges during instruction selection/scheduling,")
-print("  driven by the scaled addressing mode difference (short uses << #1).")
+print("  the clustering difference emerges during instruction selection/scheduling.")
 PYEOF
+echo
+
+# ─────────────────────────────────────────────────────────────────────
+echo "╔══════════════════════════════════════════════════════════════╗"
+echo "║  STEP 5b: LCM Scheduling Order (requires TraceOptoOutput)  ║"
+echo "╚══════════════════════════════════════════════════════════════╝"
+echo
+echo "To see the scheduling decisions, add this logging to lcm.cpp"
+echo "right before 'worklist.map((uint)idx, worklist.pop())' in"
+echo "schedule_local() (around line 711):"
+echo
+echo '  if (TraceOptoOutput && n->is_Mach()) {'
+echo '    int iop = n->as_Mach()->ideal_Opcode();'
+echo '    if (iop == Op_XorI || iop == Op_RShiftI || iop == Op_MulI || iop == Op_AddI) {'
+echo '      tty->print("[sched-pick] %s(%d) choice=%d latency=%d score=%d\\n",'
+echo '                 NodeClassNames[iop], n->_idx, choice, latency, score);'
+echo '    }'
+echo '  }'
+echo
+echo "Then rebuild hotspot and run with -XX:+TraceOptoOutput via JMH."
+echo "Expected output:"
+echo "  BYTE:  MulI→AddI→RShiftI→XorI repeating (interleaved, XorI score=5)"
+echo "  SHORT: all MulI→AddI→RShiftI first, then all XorI (clustered, XorI score=4)"
+echo
+echo "The score = n->req() (machine node input count). Byte's XorI has req()=5"
+echo "while short's has req()=4. Since MulI has req()=5, it beats short's XorI"
+echo "in tie-breaking but ties with byte's XorI."
 echo
 
 # ─────────────────────────────────────────────────────────────────────
