@@ -546,41 +546,49 @@ Short has 12 more live registers because its expression results haven't been
 consumed by XORs yet. This is a **feedback loop**: XorIs are deferred because
 pressure is high, and pressure is high because XorIs are deferred.
 
-The **initial trigger** (verified via the existing `-XX:+TraceOptoPipelining`
-flag, no custom code needed):
+Verified via `-XX:+TraceOptoPipelining` (the existing C2 scheduling trace
+flag). In the OSR main loop block (B66), the initial state is nearly
+**identical** for both methods:
 
-The initial `ready_cnt` of load nodes differs between the two methods:
 ```
-SHORT LoadS: ready_cnt=0  (zero block-local dependencies → immediately ready)
-BYTE  LoadB: ready_cnt=1  (one block-local dependency → enters ready list later)
+                   ready=0  ready=1  ready=2+
+SHORT LoadS:           3       45        0
+BYTE  LoadB:           0       48        0
+SHORT xorI:            0        1       15
+BYTE  xorI:            0        1       15
+SHORT mulI:            0        0       32
+BYTE  mulI:            0        0       32
 ```
 
-`ready_cnt` is computed in `lcm.cpp` lines 1009-1017 by counting how many of
-a node's inputs are in the same basic block. BYTE's LoadB has one address
-computation input inside the block; SHORT's LoadS does not (its address
-computation is structured differently by instruction selection due to the
-scaled SIB addressing).
+Both have loads gated by a `convI2L_reg_reg` node (which converts the int
+loop counter to long for address computation). All loads in both methods
+have 4 machine node inputs: `CountedLoop, MachProj, AddP, convI2L`. The
+single block-local input is the convI2L node → `ready_cnt=1` for both.
 
-This determines the entire scheduling trajectory:
+Despite nearly identical starting points, the scheduling DIVERGES
+dynamically. The `OptoRegScheduling` pressure heuristic (lcm.cpp:669-689)
+computes scores differently as the scheduling progresses. In the round
+where the first chain XorI is considered:
 
-**SHORT** (`ready_cnt=0`): All 48+ LoadS nodes enter the worklist at the
-start. They all become ready simultaneously, get scheduled in rapid
-succession, enabling ALL iterations' computations to proceed. By the time
-the first chain XorI becomes ready (v0 and v1's RShiftI done), all other
-iterations have also finished → `ready_list=2` → **clustering** (the correct
-reassociation behavior: compute all values first, then XOR them).
+- SHORT XorI: `score=4` (accumulated_best=0 from other candidates)
+- BYTE XorI: `score=5` (accumulated_best=1 from other candidates)
 
-**BYTE** (`ready_cnt=1`): LoadB nodes trickle into the worklist one at a
-time as their block-local dependency is satisfied. Iterations compute
-sequentially. After iterations 0-1 complete, the first chain XorI becomes
-ready while iterations 2-15 are still waiting for their loads →
-`ready_list=43` → XorI outscores LoadB (5 vs 1) → **interleaving**
-(accidentally undoes the reassociation, but happens to reduce register
-pressure).
+This 1-point difference determines whether XorI beats competing nodes.
+Byte's XorI wins → gets interleaved → lower pressure in subsequent rounds
+→ more XorIs win → interleaving cascades. Short's XorI loses → gets
+deferred → higher pressure → more XorIs deferred → clustering cascades.
 
-To verify, run with `-XX:+TraceOptoPipelining` via JMH and look for
-`ready cnt` lines containing `loadS` and `loadB`. SHORT's loads show
-`ready cnt: 0`, BYTE's show `ready cnt: 1`.
+The initial `accumulated_best` difference (0 vs 1) is a consequence of
+which other node happened to score highest earlier in the same scheduling
+round, which depends on the specific machine node structure. The exact
+origin of this asymmetry requires tracing the pressure heuristic
+round by round (see Step 5b for the logging code to do this).
+
+**Key insight:** short's clustering is the INTENDED reassociation behavior
+(compute all values first for ILP). Byte's interleaving is accidental —
+the scheduler happens to pick XorIs early, undoing the reassociation. The
+performance problem is that 16 simultaneous live values exceed x86-64
+register capacity, making the "correct" reassociation behavior harmful.
 
 To verify, add logging to `schedule_local()` in `lcm.cpp` right before the
 `worklist.map` call (line ~711):
