@@ -481,9 +481,34 @@ The scheduling consequence:
   expression. The scheduler places XorI right after RShiftI, naturally
   interleaving.
 
-Short's mix of early and late inputs prevents consistent interleaving, so the
-scheduler defers the entire XOR chain to the end (clustering). Byte's uniformly
-late inputs allow smooth interleaving.
+### The scheduler's decision mechanism
+
+C2's local code scheduler (`lcm.cpp`, `schedule_local()`) has a register-pressure-
+aware heuristic. When register pressure exceeds a threshold, it scores ready
+nodes based on their pressure impact:
+
+- Scheduling a node that **reduces** pressure → score boosted → **picked eagerly**
+- Scheduling a node that **increases** pressure → score = 1 (minimum) → **deferred**
+
+(See `lcm.cpp` lines ~669-689, the `_scheduling_for_pressure` block.)
+
+**For byte's XorI(prev, RShiftI):** RShiftI is **single-use** (only consumed by
+this XorI). Scheduling XorI frees the RShiftI register. Net effect: pressure
+stays same or drops → score boosted → scheduled eagerly → interleaving.
+
+**For short's XorI(prev, LoadS):** LoadS is **multi-use** (consumed by BOTH MulI
+in the expression AND by this XorI). Scheduling XorI does NOT free LoadS's
+register (MulI still needs it). Net effect: pressure increases (new XorI result
+lives, LoadS still lives) → score = 1 → **deferred**.
+
+And since the inner chain is sequential (r3 depends on r2, r4 on r3, etc.),
+deferring the first LoadS-consuming XorI **blocks the entire rest of the chain**.
+The scheduler processes all expression computations first (which DO reduce
+pressure), then runs the XOR chain in one burst at the end.
+
+To verify: check `PrintIdeal` output for the XorI chain value inputs. Multi-use
+inputs (LoadS with output count > 1) cause deferral. Single-use inputs
+(RShiftI with output count = 1) allow interleaving.
 
 The interleaved pattern (byte) requires only ~2 GP registers for the XOR chain.
 The deferred pattern (short) requires all 16 values to be alive simultaneously,

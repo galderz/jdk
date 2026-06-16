@@ -217,7 +217,98 @@ done
 
 # ─────────────────────────────────────────────────────────────────────
 echo "╔══════════════════════════════════════════════════════════════╗"
-echo "║  STEP 5: Summary                                            ║"
+echo "║  STEP 5: Ideal Graph — XOR Chain Input Analysis (patch)     ║"
+echo "╚══════════════════════════════════════════════════════════════╝"
+echo
+echo "Dumping C2 Ideal graph for patch builds (explains WHY clustering occurs)..."
+echo
+
+for bench in shortXorBig byteXorBig; do
+    outfile="$OUTDIR/ideal_patch_${bench}.txt"
+    echo "  Dumping ideal: PATCH $bench ..."
+    $PATCH_DBG -jar "$PATCH_JAR" \
+        "VectorReduction2.NoSuperword.$bench" \
+        $JMH_FAST_OPTS \
+        -jvmArgs "-XX:+PrintIdeal -XX:CompileCommand=compileonly,*VectorReduction2::$bench" \
+        2>&1 > "$outfile"
+done
+echo
+
+# Analyze XOR chain inputs
+python3 - "$OUTDIR" << 'PYEOF'
+import re, sys, os
+
+outdir = sys.argv[1]
+
+for bench in ['shortXorBig', 'byteXorBig']:
+    filename = os.path.join(outdir, f'ideal_patch_{bench}.txt')
+    if not os.path.exists(filename):
+        print(f"  {bench}: ideal graph file not found")
+        continue
+
+    with open(filename) as f:
+        lines = f.readlines()
+
+    nodes = {}
+    for line in lines:
+        m = re.match(r'\s*(\d+)\s+(\w+)\s+===\s+(.*?)\s*\[\[\s*(.*?)\s*\]\]', line)
+        if m:
+            nid = m.group(1)
+            nodes[nid] = {
+                'type': m.group(2),
+                'inputs': [x.strip() for x in m.group(3).split() if x.strip() != '_'],
+                'outputs': [x.strip() for x in m.group(4).split() if x.strip()]
+            }
+
+    # Find inner chain XorI nodes
+    chain_inputs = []
+    for nid, info in nodes.items():
+        if info['type'] != 'XorI':
+            continue
+        has_xor_input = any(inp in nodes and nodes[inp]['type'] == 'XorI' for inp in info['inputs'])
+        if not has_xor_input or len(info['outputs']) > 2:
+            continue
+        for inp in info['inputs']:
+            if inp in nodes and nodes[inp]['type'] != 'XorI':
+                val_type = nodes[inp]['type']
+                val_uses = len(nodes[inp]['outputs'])
+                chain_inputs.append((nid, inp, val_type, val_uses))
+
+    multi_use = sum(1 for _, _, t, u in chain_inputs if t != 'RShiftI' and u > 1)
+    single_use_rshift = sum(1 for _, _, t, u in chain_inputs if t == 'RShiftI')
+    other_single = sum(1 for _, _, t, u in chain_inputs if t != 'RShiftI' and u <= 1)
+
+    print(f"  {bench}: {len(chain_inputs)} chain inputs")
+    print(f"    RShiftI (single-use, late, freed by XOR):  {single_use_rshift}")
+    print(f"    Multi-use (NOT freed by XOR → deferred):   {multi_use}")
+    if other_single > 0:
+        print(f"    Other single-use:                          {other_single}")
+
+    # Show multi-use details
+    for xor_nid, val_nid, val_type, val_uses in chain_inputs:
+        if val_type != 'RShiftI' and val_uses > 1:
+            user_types = []
+            for out in nodes[val_nid]['outputs']:
+                if out in nodes:
+                    user_types.append(nodes[out]['type'])
+            print(f"      → {val_type}({val_nid}): {val_uses} uses by {user_types}")
+    print()
+
+print("  Explanation:")
+print("  C2's schedule_local() (lcm.cpp) defers nodes that INCREASE register")
+print("  pressure. XorI consuming a multi-use value (LoadS used by both MulI")
+print("  and XorI) does NOT free the input register → pressure increases →")
+print("  score = 1 (minimum) → deferred. This blocks the entire sequential")
+print("  XOR chain, causing clustering.")
+print()
+print("  XorI consuming a single-use RShiftI DOES free the register →")
+print("  pressure decreases → high score → scheduled eagerly → interleaving.")
+PYEOF
+echo
+
+# ─────────────────────────────────────────────────────────────────────
+echo "╔══════════════════════════════════════════════════════════════╗"
+echo "║  STEP 6: Summary                                            ║"
 echo "╚══════════════════════════════════════════════════════════════╝"
 echo
 echo "Key metrics to compare:"
