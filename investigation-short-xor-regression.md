@@ -546,49 +546,55 @@ Short has 12 more live registers because its expression results haven't been
 consumed by XORs yet. This is a **feedback loop**: XorIs are deferred because
 pressure is high, and pressure is high because XorIs are deferred.
 
-Verified via `-XX:+TraceOptoPipelining` (the existing C2 scheduling trace
-flag). In the OSR main loop block (B66), the initial state is nearly
-**identical** for both methods:
+Verified via `-XX:+TraceOptoPipelining` (the existing C2 scheduling trace).
+
+JMH executes the **standard** C2 compilation (not OSR). In the standard
+compilation's main loop block (B61), the initial states DIFFER:
 
 ```
-                   ready=0  ready=1  ready=2+
-SHORT LoadS:           3       45        0
-BYTE  LoadB:           0       48        0
-SHORT xorI:            0        1       15
-BYTE  xorI:            0        1       15
-SHORT mulI:            0        0       32
-BYTE  mulI:            0        0       32
+Standard compilation (B61) — what JMH executes:
+                   ready=0  ready=1  convI2L in block
+SHORT LoadS:          48        0       0
+BYTE  LoadB:           0       48       1
 ```
 
-Both have loads gated by a `convI2L_reg_reg` node (which converts the int
-loop counter to long for address computation). All loads in both methods
-have 4 machine node inputs: `CountedLoop, MachProj, AddP, convI2L`. The
-single block-local input is the convI2L node → `ready_cnt=1` for both.
+**SHORT B61**: The ConvI2L (int→long for address computation) is **hoisted
+out of the block** by GCM. With no ConvI2L in the block, all 48 LoadS
+nodes have zero block-local dependencies → `ready_cnt=0` → ALL immediately
+ready at block start. The scheduler picks loads in rapid succession, all
+iterations compute in parallel, all RShiftI values are ready before any
+chain XorI → **clustering** (correct reassociation behavior: compute
+everything first, then XOR).
 
-Despite nearly identical starting points, the scheduling DIVERGES
-dynamically. The `OptoRegScheduling` pressure heuristic (lcm.cpp:669-689)
-computes scores differently as the scheduling progresses. In the round
-where the first chain XorI is considered:
+**BYTE B61**: The ConvI2L **remains inside the block**. All 48 LoadB nodes
+depend on it → `ready_cnt=1`. When ConvI2L is scheduled, all 48 loads
+become ready at once (ready list floods to ~49). But computation nodes
+from the first iteration (MulI, AddI) also become ready quickly, and
+the pressure heuristic gives them high scores. After ~2 iterations of
+loads+computation, the first chain XorI becomes ready (score=5) alongside
+~43 pending loads (score=1). XorI wins → **interleaved** (accidentally
+undoes reassociation, but keeps register pressure low).
 
-- SHORT XorI: `score=4` (accumulated_best=0 from other candidates)
-- BYTE XorI: `score=5` (accumulated_best=1 from other candidates)
+**Why GCM places ConvI2L differently:** The ConvI2L converts the int loop
+counter to long for array address computation. For short arrays (element
+size=2, scaled SIB addressing `[base + index*2]`), the ConvI2L may be
+hoisted because the scaled index computation is foldable into the
+addressing mode, allowing the int→long conversion to happen earlier.
+For byte arrays (element size=1, unscaled), the ConvI2L feeds directly
+into the address computation within the block.
 
-This 1-point difference determines whether XorI beats competing nodes.
-Byte's XorI wins → gets interleaved → lower pressure in subsequent rounds
-→ more XorIs win → interleaving cascades. Short's XorI loses → gets
-deferred → higher pressure → more XorIs deferred → clustering cascades.
-
-The initial `accumulated_best` difference (0 vs 1) is a consequence of
-which other node happened to score highest earlier in the same scheduling
-round, which depends on the specific machine node structure. The exact
-origin of this asymmetry requires tracing the pressure heuristic
-round by round (see Step 5b for the logging code to do this).
+To verify: run with `-XX:+TraceOptoPipelining -XX:CompileCommand=compileonly,...`
+via JMH. Search for the block with 48 loads and 16 xorI nodes. Check
+the `ready cnt` for load nodes and the number of `convI2L` nodes in
+that block.
 
 **Key insight:** short's clustering is the INTENDED reassociation behavior
 (compute all values first for ILP). Byte's interleaving is accidental —
-the scheduler happens to pick XorIs early, undoing the reassociation. The
-performance problem is that 16 simultaneous live values exceed x86-64
-register capacity, making the "correct" reassociation behavior harmful.
+the scheduler picks XorIs early because the ConvI2L serializes load
+availability, creating a scheduling window where XorI outscores pending
+loads. The performance problem is that 16 simultaneous live values
+exceed x86-64 register capacity, making the "correct" reassociation
+behavior harmful.
 
 To verify, add logging to `schedule_local()` in `lcm.cpp` right before the
 `worklist.map` call (line ~711):
@@ -666,25 +672,29 @@ benchmark.
 ## Summary of Root Cause Chain
 
 ```
-Instruction selection: different machine node structures for byte vs short
+GCM (gcm.cpp) places ConvI2L (int→long for address computation) differently:
+  SHORT: ConvI2L hoisted OUT of main loop block → 0 convI2L in block
+  BYTE:  ConvI2L stays INSIDE main loop block   → 1 convI2L in block
     ↓
-LoadS: ready_cnt=0 (all address inputs external to block)
-LoadB: ready_cnt=1 (one address input inside block)
+Initial ready_cnt for loads in standard compilation's main loop:
+  SHORT: all 48 LoadS at ready_cnt=0 (no block-local dependencies)
+  BYTE:  all 48 LoadB at ready_cnt=1 (waiting for convI2L)
     ↓
-SHORT: all 48 loads ready immediately → all iterations compute in parallel
-       → all 16 RShiftI values ready before any chain XorI → CLUSTERING
-       (this is the CORRECT reassociation behavior)
-BYTE:  loads trickle in one at a time → iterations compute sequentially
-       → first chain XorI ready while 43 loads still pending → INTERLEAVING
-       (accidentally undoes reassociation, but reduces register pressure)
+SHORT: all loads ready immediately → all iterations compute in parallel
+       → all values ready before first chain XorI → CLUSTERING
+       (correct reassociation behavior)
+BYTE:  loads gated by convI2L → flood ready list when convI2L completes
+       → scheduler processes load+compute iteratively
+       → first chain XorI ready with 43 loads still pending (score=5 vs 1)
+       → INTERLEAVING (accidentally undoes reassociation)
     ↓
 SHORT clustering: 16 values alive simultaneously → 76 XMM spills → -69%
 BYTE interleaving: 1-2 values alive at a time → 3 XMM spills → no regression
 ```
 
-(Verified with `-XX:+TraceOptoPipelining` — the existing C2 scheduling trace
-flag. Look for `ready cnt` lines: SHORT LoadS shows 0, BYTE LoadB shows 1.
-This single-count difference determines the entire scheduling trajectory.)
+(Verified with `-XX:+TraceOptoPipelining`. In the standard compilation's
+main loop block: SHORT has 0 convI2L and all loads at ready_cnt=0;
+BYTE has 1 convI2L and all loads at ready_cnt=1.)
 
 ---
 
