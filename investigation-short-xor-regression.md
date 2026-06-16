@@ -546,10 +546,23 @@ Short has 12 more live registers because its expression results haven't been
 consumed by XORs yet. This is a **feedback loop**: XorIs are deferred because
 pressure is high, and pressure is high because XorIs are deferred.
 
-The **initial trigger** is the higher baseline register pressure from scaled
-SIB addressing (`[base + index*2]`), which requires the loop counter in a
-dedicated register. This shifts `accumulated_best` by 1 in the earliest
-scheduling rounds, which cascades through all subsequent decisions.
+The **initial trigger** (verified via `TraceOptoOutput` candidate logging):
+scaled SIB addressing for short creates **extra address computation nodes**
+in the machine graph (ConvI2L, LShiftL for index*2) that don't exist for
+byte's unscaled addressing. These extra nodes lengthen the dependency chain:
+
+```
+SHORT: loop_counter → ConvI2L → LShiftL → AddP → LoadS → MulI → AddI → RShiftI
+BYTE:  loop_counter →                      AddP → LoadB → MulI → AddI → RShiftI
+```
+
+This delays when the first inner-chain XorI becomes ready:
+- **SHORT**: 360 nodes scheduled before first chain XorI (ready_list=2, nothing left)
+- **BYTE**: 299 nodes scheduled before first chain XorI (ready_list=43, loads pending)
+
+When byte's XorI becomes ready alongside 43 LoadB nodes, it outscores them
+(score=5 vs LoadB=1) and gets interleaved. When short's XorI becomes ready,
+there's nothing else to interleave with.
 
 To verify, add logging to `schedule_local()` in `lcm.cpp` right before the
 `worklist.map` call (line ~711):
