@@ -546,23 +546,41 @@ Short has 12 more live registers because its expression results haven't been
 consumed by XORs yet. This is a **feedback loop**: XorIs are deferred because
 pressure is high, and pressure is high because XorIs are deferred.
 
-The **initial trigger** (verified via `TraceOptoOutput` candidate logging):
-scaled SIB addressing for short creates **extra address computation nodes**
-in the machine graph (ConvI2L, LShiftL for index*2) that don't exist for
-byte's unscaled addressing. These extra nodes lengthen the dependency chain:
+The **initial trigger** (verified via the existing `-XX:+TraceOptoPipelining`
+flag, no custom code needed):
 
+The initial `ready_cnt` of load nodes differs between the two methods:
 ```
-SHORT: loop_counter → ConvI2L → LShiftL → AddP → LoadS → MulI → AddI → RShiftI
-BYTE:  loop_counter →                      AddP → LoadB → MulI → AddI → RShiftI
+SHORT LoadS: ready_cnt=0  (zero block-local dependencies → immediately ready)
+BYTE  LoadB: ready_cnt=1  (one block-local dependency → enters ready list later)
 ```
 
-This delays when the first inner-chain XorI becomes ready:
-- **SHORT**: 360 nodes scheduled before first chain XorI (ready_list=2, nothing left)
-- **BYTE**: 299 nodes scheduled before first chain XorI (ready_list=43, loads pending)
+`ready_cnt` is computed in `lcm.cpp` lines 1009-1017 by counting how many of
+a node's inputs are in the same basic block. BYTE's LoadB has one address
+computation input inside the block; SHORT's LoadS does not (its address
+computation is structured differently by instruction selection due to the
+scaled SIB addressing).
 
-When byte's XorI becomes ready alongside 43 LoadB nodes, it outscores them
-(score=5 vs LoadB=1) and gets interleaved. When short's XorI becomes ready,
-there's nothing else to interleave with.
+This determines the entire scheduling trajectory:
+
+**SHORT** (`ready_cnt=0`): All 48+ LoadS nodes enter the worklist at the
+start. They all become ready simultaneously, get scheduled in rapid
+succession, enabling ALL iterations' computations to proceed. By the time
+the first chain XorI becomes ready (v0 and v1's RShiftI done), all other
+iterations have also finished → `ready_list=2` → **clustering** (the correct
+reassociation behavior: compute all values first, then XOR them).
+
+**BYTE** (`ready_cnt=1`): LoadB nodes trickle into the worklist one at a
+time as their block-local dependency is satisfied. Iterations compute
+sequentially. After iterations 0-1 complete, the first chain XorI becomes
+ready while iterations 2-15 are still waiting for their loads →
+`ready_list=43` → XorI outscores LoadB (5 vs 1) → **interleaving**
+(accidentally undoes the reassociation, but happens to reduce register
+pressure).
+
+To verify, run with `-XX:+TraceOptoPipelining` via JMH and look for
+`ready cnt` lines containing `loadS` and `loadB`. SHORT's loads show
+`ready cnt: 0`, BYTE's show `ready cnt: 1`.
 
 To verify, add logging to `schedule_local()` in `lcm.cpp` right before the
 `worklist.map` call (line ~711):
@@ -640,30 +658,25 @@ benchmark.
 ## Summary of Root Cause Chain
 
 ```
-short arrays: element size = 2 bytes
+Instruction selection: different machine node structures for byte vs short
     ↓
-x86 SIB addressing: [base + index * 2 + disp]
+LoadS: ready_cnt=0 (all address inputs external to block)
+LoadB: ready_cnt=1 (one address input inside block)
     ↓
-Loop counter in dedicated register → higher baseline register pressure
+SHORT: all 48 loads ready immediately → all iterations compute in parallel
+       → all 16 RShiftI values ready before any chain XorI → CLUSTERING
+       (this is the CORRECT reassociation behavior)
+BYTE:  loads trickle in one at a time → iterations compute sequentially
+       → first chain XorI ready while 43 loads still pending → INTERLEAVING
+       (accidentally undoes reassociation, but reduces register pressure)
     ↓
-LCM schedule_local() pressure heuristic (lcm.cpp:669-689):
-  score = (accumulated_best + req) - int_pressure
-  byte: accumulated_best=1 → XorI score=5, ties with MulI → interleaved
-  short: accumulated_best=0 → XorI score=4, loses to MulI(score=4 seen first) → deferred
-    ↓
-Feedback loop: XorI deferred → pressure grows → more XorIs deferred
-    ↓
-All 16 expression results computed → then all XorIs in burst (clustering)
-    ↓
-16 intermediate values alive simultaneously → register pressure spike
-    ↓
-Patch: 76 XMM moves (short) vs 3 (byte) — catastrophic spill cascade
+SHORT clustering: 16 values alive simultaneously → 76 XMM spills → -69%
+BYTE interleaving: 1-2 values alive at a time → 3 XMM spills → no regression
 ```
 
-(Verified from actual JMH assembly dumps. Scheduling order and pressure
-values verified via `TraceOptoOutput` with custom logging in `schedule_local`.
-Both XorI machine nodes have req()=3; the score difference comes entirely
-from the pressure boost, not from req() itself.)
+(Verified with `-XX:+TraceOptoPipelining` — the existing C2 scheduling trace
+flag. Look for `ready cnt` lines: SHORT LoadS shows 0, BYTE LoadB shows 1.
+This single-count difference determines the entire scheduling trajectory.)
 
 ---
 
