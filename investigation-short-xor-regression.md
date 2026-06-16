@@ -445,9 +445,45 @@ PATCH byte:  ...MAnXnnnMAMAnXnnnMAMAnXnnnMAMAnXnnnMAMAnXnnn...
 
 **The clustering does NOT appear in the baseline.** Without reassociation,
 both methods have XOR runs of at most 3 (sequential `acc ^= val` pattern).
-The reassociation creates the long deferred chain, and the register allocator
-only defers it for short (where it can't interleave due to register pressure
-from scaled addressing).
+
+### Why clustering happens for short but not byte
+
+After reassociation creates the inner XOR chain, IGVN (Iterative Global Value
+Numbering) runs identity transformations that produce different IR structures:
+
+**Short's inner chain** (verified via `-XX:+PrintIdeal`):
+```
+XorI(RShiftI, XorI(LoadS, XorI(LoadS, XorI(LoadS, XorI(MulI, XorI(RShiftI, ...))))))
+          ↑              ↑         ↑         ↑         ↑
+        late           EARLY     EARLY     EARLY     EARLY    ← mix of early and late
+```
+
+**Byte's inner chain**:
+```
+XorI(RShiftI, XorI(RShiftI, XorI(RShiftI, XorI(RShiftI, XorI(RShiftI, ...)))))
+          ↑            ↑            ↑            ↑            ↑
+        late          late         late         late         late    ← uniformly late
+```
+
+The mechanism:
+- IGVN eliminates redundant I2S narrowing on `LoadS` values because `LoadS`
+  already returns values in short range — `I2S(LoadS) = LoadS` (identity).
+  This leaves raw `LoadS` (and raw `MulI` for sub-expressions in short range)
+  feeding directly into the XorI chain.
+- For byte, IGVN **cannot** eliminate `I2B` on expression results because
+  `(a*b)+(a*c)+(b*c)` for byte values produces results in [-48768, 48896]
+  — far exceeding byte range [-128, 127]. The `RShiftI+LShiftI` stays.
+
+The scheduling consequence:
+- `LoadS` (array load) is available **early** — as soon as memory is accessed.
+  It must stay alive in a register until the XOR chain reaches its position.
+- `RShiftI` (narrowing) is available **late** — computed after the full
+  expression. The scheduler places XorI right after RShiftI, naturally
+  interleaving.
+
+Short's mix of early and late inputs prevents consistent interleaving, so the
+scheduler defers the entire XOR chain to the end (clustering). Byte's uniformly
+late inputs allow smooth interleaving.
 
 The interleaved pattern (byte) requires only ~2 GP registers for the XOR chain.
 The deferred pattern (short) requires all 16 values to be alive simultaneously,
