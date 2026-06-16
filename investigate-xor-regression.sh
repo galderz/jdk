@@ -312,26 +312,38 @@ echo "╔═══════════════════════�
 echo "║  STEP 5b: LCM Scheduling Order (requires TraceOptoOutput)  ║"
 echo "╚══════════════════════════════════════════════════════════════╝"
 echo
-echo "To see the scheduling decisions, add this logging to lcm.cpp"
-echo "right before 'worklist.map((uint)idx, worklist.pop())' in"
-echo "schedule_local() (around line 711):"
+echo "To see the scheduling decisions, add TWO logging blocks to lcm.cpp"
+echo "in schedule_local():"
 echo
+echo "1. Inside the pressure heuristic (after n_score is computed, ~line 679):"
 echo '  if (TraceOptoOutput && n->is_Mach()) {'
 echo '    int iop = n->as_Mach()->ideal_Opcode();'
-echo '    if (iop == Op_XorI || iop == Op_RShiftI || iop == Op_MulI || iop == Op_AddI) {'
-echo '      tty->print("[sched-pick] %s(%d) choice=%d latency=%d score=%d\\n",'
-echo '                 NodeClassNames[iop], n->_idx, choice, latency, score);'
+echo '    if (iop == Op_XorI || iop == Op_MulI || iop == Op_AddI || iop == Op_RShiftI) {'
+echo '      tty->print("[sched-pressure] %s(%d) int_pressure=%d cur_pressure=%d'
+echo '                  limit=%d score_before=%d score_after=%d\\n", ...);'
+echo '    }'
+echo '  }'
+echo
+echo "2. Right before worklist.pop() (~line 711), log the winner with inputs:"
+echo '  if (TraceOptoOutput && n->is_Mach()) {'
+echo '    int iop = n->as_Mach()->ideal_Opcode();'
+echo '    if (iop == Op_XorI || ...) {'
+echo '      tty->print("[sched-pick] %s(%d) choice=%d latency=%d score=%d(req=%d)\\n",'
+echo '                 NodeClassNames[iop], n->_idx, choice, latency, score, n->req());'
 echo '    }'
 echo '  }'
 echo
 echo "Then rebuild hotspot and run with -XX:+TraceOptoOutput via JMH."
-echo "Expected output:"
-echo "  BYTE:  MulI→AddI→RShiftI→XorI repeating (interleaved, XorI score=5)"
-echo "  SHORT: all MulI→AddI→RShiftI first, then all XorI (clustered, XorI score=4)"
 echo
-echo "The score = n->req() (machine node input count). Byte's XorI has req()=5"
-echo "while short's has req()=4. Since MulI has req()=5, it beats short's XorI"
-echo "in tie-breaking but ties with byte's XorI."
+echo "Expected output for the main loop XorI scheduling:"
+echo "  BYTE:  XorI int_pressure=-1, cur_pressure=~19, score=5 → interleaved"
+echo "  SHORT: XorI int_pressure=-1, cur_pressure=~31, score=4 → clustered"
+echo
+echo "Both XorI machine nodes have req()=3. The score difference (5 vs 4) comes"
+echo "from the pressure boost formula: score = (accumulated_best + req) - int_pressure."
+echo "Short has higher cur_pressure (more live values from deferred XORs), which"
+echo "shifts accumulated_best lower, producing a lower final score."
+echo "This is a feedback loop: XorIs deferred → pressure grows → more XorIs deferred."
 echo
 
 # ─────────────────────────────────────────────────────────────────────

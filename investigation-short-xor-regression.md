@@ -521,23 +521,35 @@ methods (verified via `TraceOptoOutput` logging in `schedule_local`). So the
 tie-breaker is `n_score = n->req()` — the number of input edges on the
 machine node.
 
-**The exact cause:** instruction selection produces different machine node
-structures for byte vs short array access, resulting in different `n->req()`:
+**The exact cause** (verified via `TraceOptoOutput` and custom logging in
+`schedule_local`): Both XorI machine nodes have `req()=3`. The score
+difference comes from the **register pressure boost** in the `OptoRegScheduling`
+block (lcm.cpp:669-689). Each XorI reduces pressure by 1 (`int_pressure=-1`).
+The score formula is:
 
 ```
-BYTE:  XorI machine node has req()=5  →  score=5
-       MulI machine node has req()=1 or 5
-       → XorI score ≥ MulI score → XorI WINS tie-break → scheduled early
-
-SHORT: XorI machine node has req()=4  →  score=4
-       MulI machine node has req()=5
-       → MulI score > XorI score → MulI WINS → XorI DEFERRED
+n_score = (accumulated_best_score + n->req()) - int_pressure
+        = (accumulated_best + 3) + 1
 ```
 
-When short's MulI consistently beats XorI in the tie-break, ALL expression
-computations get scheduled before any XorI. Then the entire XOR chain runs
-in one burst at the end (clustering). For byte, XorI wins ties and gets
-interleaved after each iteration's computation.
+At the point the first main-loop XorI is evaluated:
+
+```
+SHORT: cur_pressure=31, accumulated_best=0 → score = 0+3+1 = 4
+       (competing MulI also scores 4 → tie, but MulI was seen first → MulI wins)
+BYTE:  cur_pressure=19, accumulated_best=1 → score = 1+3+1 = 5
+       (competing MulI scores 5 too → tie, but XorI ties → XorI gets scheduled)
+```
+
+The critical difference is `cur_pressure`: **31 for short vs 19 for byte**.
+Short has 12 more live registers because its expression results haven't been
+consumed by XORs yet. This is a **feedback loop**: XorIs are deferred because
+pressure is high, and pressure is high because XorIs are deferred.
+
+The **initial trigger** is the higher baseline register pressure from scaled
+SIB addressing (`[base + index*2]`), which requires the loop counter in a
+dedicated register. This shifts `accumulated_best` by 1 in the earliest
+scheduling rounds, which cascades through all subsequent decisions.
 
 To verify, add logging to `schedule_local()` in `lcm.cpp` right before the
 `worklist.map` call (line ~711):
@@ -619,22 +631,26 @@ short arrays: element size = 2 bytes
     ↓
 x86 SIB addressing: [base + index * 2 + disp]
     ↓
-Instruction selection: scaled addressing produces machine nodes with
-different input counts (req()) than byte's unscaled addressing
+Loop counter in dedicated register → higher baseline register pressure
     ↓
-LCM schedule_local() tie-breaks on n->req() when latency is equal:
-  byte XorI: req()=5 ≥ competing MulI → XorI WINS → interleaved
-  short XorI: req()=4 < competing MulI(5) → MulI WINS → XorI deferred
+LCM schedule_local() pressure heuristic (lcm.cpp:669-689):
+  score = (accumulated_best + req) - int_pressure
+  byte: accumulated_best=1 → XorI score=5, ties with MulI → interleaved
+  short: accumulated_best=0 → XorI score=4, loses to MulI(score=4 seen first) → deferred
     ↓
-All expression nodes scheduled before any XorI → XOR chain clustered at end
+Feedback loop: XorI deferred → pressure grows → more XorIs deferred
+    ↓
+All 16 expression results computed → then all XorIs in burst (clustering)
     ↓
 16 intermediate values alive simultaneously → register pressure spike
     ↓
 Patch: 76 XMM moves (short) vs 3 (byte) — catastrophic spill cascade
 ```
 
-(Numbers verified from actual JMH assembly dumps. Scheduling order verified
-via `TraceOptoOutput` logging in `schedule_local`.)
+(Verified from actual JMH assembly dumps. Scheduling order and pressure
+values verified via `TraceOptoOutput` with custom logging in `schedule_local`.
+Both XorI machine nodes have req()=3; the score difference comes entirely
+from the pressure boost, not from req() itself.)
 
 ---
 
