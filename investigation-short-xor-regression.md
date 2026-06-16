@@ -575,13 +575,27 @@ loads+computation, the first chain XorI becomes ready (score=5) alongside
 ~43 pending loads (score=1). XorI wins → **interleaved** (accidentally
 undoes reassociation, but keeps register pressure low).
 
-**Why GCM places ConvI2L differently:** The ConvI2L converts the int loop
-counter to long for array address computation. For short arrays (element
-size=2, scaled SIB addressing `[base + index*2]`), the ConvI2L may be
-hoisted because the scaled index computation is foldable into the
-addressing mode, allowing the int→long conversion to happen earlier.
-For byte arrays (element size=1, unscaled), the ConvI2L feeds directly
-into the address computation within the block.
+**Why ConvI2L is absent for short but present for byte:** This is an
+**instruction selection** difference in the x86 `.ad` file matching rules.
+
+- **SHORT** (`loadS`): The x86 machine node for short array loads uses
+  **scaled SIB addressing** `[base + int_index*2 + disp]`. The load takes
+  the int loop counter Phi **directly** as index — the SIB encoding handles
+  the `*2` scaling and the hardware sign-extends the 32-bit index to 64-bit.
+  No ConvI2L machine node is needed. In B61, loads use `Phi(140)` directly
+  (pre-scheduled at block header, `ready_cnt=-2`) → loads have `ready_cnt=0`.
+
+- **BYTE** (`loadB`): The x86 machine node for byte array loads uses
+  **unscaled addressing** `[base + long_index + disp]`. The index must be a
+  64-bit long, so an explicit `convI2L_reg_reg` machine node is emitted to
+  convert the int loop counter. This ConvI2L lives in the loop body block →
+  loads depend on it → `ready_cnt=1`.
+
+This difference is NOT visible in `PrintIdeal` (both have ConvI2L in the
+ideal graph). It emerges during **instruction selection** when the ideal
+nodes are matched to x86 machine nodes via the `.ad` file rules. The scaled
+SIB addressing mode for short folds the int→long conversion into the load
+instruction, while unscaled byte addressing requires a separate ConvI2L.
 
 To verify: run with `-XX:+TraceOptoPipelining -XX:CompileCommand=compileonly,...`
 via JMH. Search for the block with 48 loads and 16 xorI nodes. Check
