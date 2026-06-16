@@ -465,38 +465,40 @@ XorI(RShiftI, XorI(RShiftI, XorI(RShiftI, XorI(RShiftI, XorI(RShiftI, ...)))))
         late          late         late         late         late    ← uniformly late
 ```
 
-The mechanism (`RShiftNode::IdentityIL()` in `mulnode.cpp:1240-1256`):
+**The IR is identical for both methods.** Diagnostic prints inside
+`reassociate_chain()` confirm ALL extracted chain values are `RShiftI` at
+extraction time — identical for both byte and short. Furthermore, logging
+inside `RShiftNode::IdentityIL()` (mulnode.cpp:1240) and `RShiftINode::Ideal()`
+(mulnode.cpp:1322) shows these rules fire the SAME number of times for
+both methods.
 
-C2 has an Identity rule that eliminates the `(x << N) >> N` sign-extension
-pattern when `type(x)` already fits in the sign-extended range:
-```cpp
-// mulnode.cpp:1240
-if (in(1)->Opcode() == Op_LShift(bt) && in(1)->in(2) == in(2)) {
-    // Does actual value fit inside the sign-extension range?
-    if (lo <= t11->lo_as_long() && t11->hi_as_long() <= hi) {
-        return in(1)->in(1);  // Shifting is a nop → return x directly
-    }
-}
+**IMPORTANT: `PrintIdeal` outputs TWO compilations** (OSR + standard) with
+overlapping node IDs in the same stream. If you grep for XorI inputs without
+separating compilations, you may see `LoadS`/`MulI` from the standard
+compilation mixed with `RShiftI` from the OSR compilation, creating the
+illusion of structural differences. Always check for node ID conflicts:
+```python
+# Detect overlapping compilations in PrintIdeal output
+import re
+node_types = {}
+for line in open('ideal_output.txt'):
+    m = re.match(r'\s*(\d+)\s+(\w+)\s+===', line)
+    if m and m.group(1) in node_types and node_types[m.group(1)] != m.group(2):
+        print(f"CONFLICT: node {m.group(1)} is {node_types[m.group(1)]} AND {m.group(2)}")
+    if m:
+        node_types[m.group(1)] = m.group(2)
 ```
 
-**Crucially:** the reassociation itself does NOT cause this. Diagnostic prints
-in `reassociate_chain()` confirm ALL extracted values are `RShiftI` at
-extraction time — identical for both methods. The transformation happens
-in the **IGVN pass that runs AFTER the reassociation**, when IGVN
-re-evaluates types on the restructured graph. The changed graph topology
-causes IGVN to compute tighter type bounds on some sub-expressions for
-short, enabling the Identity rule to fire. For byte, the expression result
-type `[-48768, 48896]` exceeds byte range `[-128, 127]`, so the
-`RShiftI+LShiftI` narrowing is always retained.
-
-You can verify this by adding a diagnostic print inside `reassociate_chain()`
-(before `build_min_max`) to see what the `left` and `right` values are at
-each chain level. Example:
+You can verify the chain inputs with a diagnostic print inside
+`reassociate_chain()` (before `build_min_max`):
 ```cpp
 tty->print("[reassoc-extract] left: %s(%d)  right: %s(%d)\n",
            NodeClassNames[left->Opcode()], left->_idx,
            NodeClassNames[right->Opcode()], right->_idx);
 ```
+
+Since the IR is identical, the clustering difference must emerge during
+instruction selection or code scheduling (after ideal graph → machine graph).
 
 The scheduling consequence:
 - `LoadS` (array load) is available **early** — as soon as memory is accessed.
@@ -599,14 +601,22 @@ More coalescing failures in Chaitin-Briggs register allocator
 Baseline: 11 XMM moves (short) vs 3 (byte) — already worse
     ↓
 Reassociation forces 16 values live simultaneously
+(IR is IDENTICAL for byte and short after reassociation + IGVN)
     ↓
-Register allocator DEFERS all XORs to end (can't interleave for short)
-→ 16 consecutive XORs + XMM reloads = deferred chain cluster
+Code scheduling (LCM) defers XOR chain under high register pressure
     ↓
 Patch: 76 XMM moves (short) vs 3 (byte) — catastrophic amplification
 ```
 
 (Numbers verified from actual JMH assembly dumps, not standalone reproducer.)
+
+**Open question:** the exact mechanism in the LCM scheduler that causes
+clustering for short but interleaving for byte remains to be fully traced.
+The IR graphs are identical, so the difference must emerge during instruction
+selection (byte arrays use unscaled addressing, short arrays use scaled `<< #1`),
+which produces different machine node structures that the LCM scheduler handles
+differently. See `schedule_local()` in `lcm.cpp` and the register pressure
+heuristic at lines ~669-689.
 
 ---
 

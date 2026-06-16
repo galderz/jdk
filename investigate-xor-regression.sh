@@ -234,7 +234,7 @@ for bench in shortXorBig byteXorBig; do
 done
 echo
 
-# Analyze XOR chain inputs
+# Analyze ideal graph — check for node ID conflicts (multiple compilations)
 python3 - "$OUTDIR" << 'PYEOF'
 import re, sys, os
 
@@ -249,18 +249,35 @@ for bench in ['shortXorBig', 'byteXorBig']:
     with open(filename) as f:
         lines = f.readlines()
 
+    # Detect multiple compilations via node ID conflicts
+    node_first = {}
+    conflicts = 0
+    for line in lines:
+        m = re.match(r'\s*(\d+)\s+(\w+)\s+===', line)
+        if m:
+            nid, ntype = m.group(1), m.group(2)
+            if nid in node_first and node_first[nid] != ntype:
+                conflicts += 1
+            else:
+                node_first[nid] = ntype
+
+    # Parse FIRST compilation only (stop at first conflict)
     nodes = {}
+    seen_ids = set()
     for line in lines:
         m = re.match(r'\s*(\d+)\s+(\w+)\s+===\s+(.*?)\s*\[\[\s*(.*?)\s*\]\]', line)
         if m:
             nid = m.group(1)
+            if nid in seen_ids:
+                break  # second compilation starts here
+            seen_ids.add(nid)
             nodes[nid] = {
                 'type': m.group(2),
                 'inputs': [x.strip() for x in m.group(3).split() if x.strip() != '_'],
                 'outputs': [x.strip() for x in m.group(4).split() if x.strip()]
             }
 
-    # Find inner chain XorI nodes
+    # Find XorI chain inputs (first compilation only)
     chain_inputs = []
     for nid, info in nodes.items():
         if info['type'] != 'XorI':
@@ -270,44 +287,24 @@ for bench in ['shortXorBig', 'byteXorBig']:
             continue
         for inp in info['inputs']:
             if inp in nodes and nodes[inp]['type'] != 'XorI':
-                val_type = nodes[inp]['type']
-                val_uses = len(nodes[inp]['outputs'])
-                chain_inputs.append((nid, inp, val_type, val_uses))
+                chain_inputs.append((nid, inp, nodes[inp]['type']))
 
-    multi_use = sum(1 for _, _, t, u in chain_inputs if t != 'RShiftI' and u > 1)
-    single_use_rshift = sum(1 for _, _, t, u in chain_inputs if t == 'RShiftI')
-    other_single = sum(1 for _, _, t, u in chain_inputs if t != 'RShiftI' and u <= 1)
+    rshift_count = sum(1 for _, _, t in chain_inputs if t == 'RShiftI')
+    other_count = sum(1 for _, _, t in chain_inputs if t != 'RShiftI')
 
-    print(f"  {bench}: {len(chain_inputs)} chain inputs")
-    print(f"    RShiftI (single-use, late, freed by XOR):  {single_use_rshift}")
-    print(f"    Multi-use (NOT freed by XOR → deferred):   {multi_use}")
-    if other_single > 0:
-        print(f"    Other single-use:                          {other_single}")
-
-    # Show multi-use details
-    for xor_nid, val_nid, val_type, val_uses in chain_inputs:
-        if val_type != 'RShiftI' and val_uses > 1:
-            user_types = []
-            for out in nodes[val_nid]['outputs']:
-                if out in nodes:
-                    user_types.append(nodes[out]['type'])
-            print(f"      → {val_type}({val_nid}): {val_uses} uses by {user_types}")
+    print(f"  {bench} (first compilation, {len(nodes)} nodes, {conflicts} ID conflicts):")
+    print(f"    XorI chain inputs: {rshift_count} RShiftI, {other_count} other")
+    if other_count > 0:
+        for _, vid, vtype in chain_inputs:
+            if vtype != 'RShiftI':
+                print(f"      non-RShiftI: {vtype}({vid})")
     print()
 
-print("  Explanation:")
-print("  C2's schedule_local() (lcm.cpp) defers nodes that INCREASE register")
-print("  pressure. XorI consuming a multi-use value (LoadS used by both MulI")
-print("  and XorI) does NOT free the input register → pressure increases →")
-print("  score = 1 (minimum) → deferred. This blocks the entire sequential")
-print("  XOR chain, causing clustering.")
-print()
-print("  XorI consuming a single-use RShiftI DOES free the register →")
-print("  pressure decreases → high score → scheduled eagerly → interleaving.")
-print()
-print("  Timeline: reassociation extracts ALL RShiftI (verified by diagnostic).")
-print("  Post-reassociation IGVN then eliminates some RShiftI via the Identity")
-print("  rule in mulnode.cpp:1240 ((x<<N)>>N is nop when type(x) fits range).")
-print("  For byte, the expression result exceeds byte range → narrowing stays.")
+print("  NOTE: PrintIdeal outputs MULTIPLE compilations with overlapping node IDs.")
+print("  This analysis uses only the FIRST compilation to avoid confusion.")
+print("  If both methods show all-RShiftI chain inputs, the IR is identical —")
+print("  the clustering difference emerges during instruction selection/scheduling,")
+print("  driven by the scaled addressing mode difference (short uses << #1).")
 PYEOF
 echo
 
