@@ -465,14 +465,38 @@ XorI(RShiftI, XorI(RShiftI, XorI(RShiftI, XorI(RShiftI, XorI(RShiftI, ...)))))
         late          late         late         late         late    ← uniformly late
 ```
 
-The mechanism:
-- IGVN eliminates redundant I2S narrowing on `LoadS` values because `LoadS`
-  already returns values in short range — `I2S(LoadS) = LoadS` (identity).
-  This leaves raw `LoadS` (and raw `MulI` for sub-expressions in short range)
-  feeding directly into the XorI chain.
-- For byte, IGVN **cannot** eliminate `I2B` on expression results because
-  `(a*b)+(a*c)+(b*c)` for byte values produces results in [-48768, 48896]
-  — far exceeding byte range [-128, 127]. The `RShiftI+LShiftI` stays.
+The mechanism (`RShiftNode::IdentityIL()` in `mulnode.cpp:1240-1256`):
+
+C2 has an Identity rule that eliminates the `(x << N) >> N` sign-extension
+pattern when `type(x)` already fits in the sign-extended range:
+```cpp
+// mulnode.cpp:1240
+if (in(1)->Opcode() == Op_LShift(bt) && in(1)->in(2) == in(2)) {
+    // Does actual value fit inside the sign-extension range?
+    if (lo <= t11->lo_as_long() && t11->hi_as_long() <= hi) {
+        return in(1)->in(1);  // Shifting is a nop → return x directly
+    }
+}
+```
+
+**Crucially:** the reassociation itself does NOT cause this. Diagnostic prints
+in `reassociate_chain()` confirm ALL extracted values are `RShiftI` at
+extraction time — identical for both methods. The transformation happens
+in the **IGVN pass that runs AFTER the reassociation**, when IGVN
+re-evaluates types on the restructured graph. The changed graph topology
+causes IGVN to compute tighter type bounds on some sub-expressions for
+short, enabling the Identity rule to fire. For byte, the expression result
+type `[-48768, 48896]` exceeds byte range `[-128, 127]`, so the
+`RShiftI+LShiftI` narrowing is always retained.
+
+You can verify this by adding a diagnostic print inside `reassociate_chain()`
+(before `build_min_max`) to see what the `left` and `right` values are at
+each chain level. Example:
+```cpp
+tty->print("[reassoc-extract] left: %s(%d)  right: %s(%d)\n",
+           NodeClassNames[left->Opcode()], left->_idx,
+           NodeClassNames[right->Opcode()], right->_idx);
+```
 
 The scheduling consequence:
 - `LoadS` (array load) is available **early** — as soon as memory is accessed.

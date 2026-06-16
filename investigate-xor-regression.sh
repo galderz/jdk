@@ -303,6 +303,11 @@ print("  XOR chain, causing clustering.")
 print()
 print("  XorI consuming a single-use RShiftI DOES free the register →")
 print("  pressure decreases → high score → scheduled eagerly → interleaving.")
+print()
+print("  Timeline: reassociation extracts ALL RShiftI (verified by diagnostic).")
+print("  Post-reassociation IGVN then eliminates some RShiftI via the Identity")
+print("  rule in mulnode.cpp:1240 ((x<<N)>>N is nop when type(x) fits range).")
+print("  For byte, the expression result exceeds byte range → narrowing stays.")
 PYEOF
 echo
 
