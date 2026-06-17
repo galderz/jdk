@@ -615,11 +615,25 @@ For SHORT: the address tree is `AddP(AddP(base, LShiftL(ConvI2L(phi), 1)), off)`
 This matches `indPosIndexScaleOffset` perfectly — ConvI2L is folded, no
 separate machine node emitted.
 
-For BYTE: the address tree for unscaled access `AddP(AddP(base, ConvI2L(phi)), off)`
-should match `indPosIndexOffset`, but in the standard compilation the address
-tree has a different shape (possibly different AddP nesting from loop unrolling)
-that causes the predicate to fail. The matcher falls back to `indIndexOffset`
-which requires `rRegL` — an explicit `convI2L_reg_reg` machine node.
+For BYTE: after 16x unrolling, C2 precomputes `array_base + array_header`
+per iteration into a single pointer (since there's no scaling to prevent
+this). The address tree collapses to `AddP(precomputed_base, ConvI2L(phi))`
+— a flat AddP that matches `indIndex(reg, rRegL)` or `indIndexOffset(reg,
+rRegL, off)`, both of which require `rRegL` (long register). The
+`indPosIndexOffset` pattern (which expects `AddP(AddP(reg, ConvI2L(idx)),
+off)` — nested AddP) does NOT match the flat tree. Result: ConvI2L is NOT
+folded → separate `convI2L_reg_reg` emitted.
+
+Proof from the generated addressing modes:
+```
+SHORT: movswl R8, [R11 + #18 + R13 << #1]   ← 3 components: base, off, idx*2
+  indPosIndexScaleOffset matched: LShiftL(ConvI2L(phi), 1) is a non-collapsible
+  subtree → ConvI2L folded into operand, load takes rRegI (int Phi) directly
+
+BYTE:  movsbl R10, [R10 + #17 + RBP]        ← RBP = output of convI2L_reg_reg
+  indIndexOffset matched: RBP is rRegL (long), produced by separate convI2L
+  The R10+#17 base was precomputed, collapsing the nested AddP structure
+```
 
 Verified by examining machine node inputs in `-XX:+TraceOptoPipelining`:
 - SHORT B61 loads: idx input is `Phi(140)` (int, pre-scheduled) → `ready_cnt=0`
