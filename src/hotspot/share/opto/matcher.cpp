@@ -1728,10 +1728,10 @@ MachNode *Matcher::ReduceInst( State *s, int rule, Node *&mem ) {
                  NodeClassNames[addp->in(3)->Opcode()], addp->in(3)->_idx);
       // After the existing AddP child dump, add:
       Node* addp_inner = addp->in(2);  // the address input of the outer AddP
-      if (addp_inner != nullptr && addp_inner->is_Mach()) {
+      if (addp_inner != nullptr) {
         tty->print("[matcher]   AddP(%d).in(2) = %s(%d), its children:",
                    addp->_idx,
-                   NodeClassNames[addp_inner->as_Mach()->ideal_Opcode()],
+                   NodeClassNames[addp_inner->Opcode()],
                    addp_inner->_idx);
         for (uint k = 1; k < addp_inner->req(); k++) {
           Node* child = addp_inner->in(k);
