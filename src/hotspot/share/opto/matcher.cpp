@@ -1720,6 +1720,12 @@ MachNode *Matcher::ReduceInst( State *s, int rule, Node *&mem ) {
       tty->print("[matcher] %s(%d) → instr rule: %s, addr=AddP(%d)\n",
                  NodeClassNames[ideal_op], leaf->_idx, _ruleName[rule],
                  leaf->in(MemNode::Address)->_idx);
+      Node* addp = leaf->in(MemNode::Address);
+      tty->print("[matcher]   AddP(%d) children: in(1)=%s(%d) in(2)=%s(%d) in(3)=%s(%d)\n",
+                 addp->_idx,
+                 NodeClassNames[addp->in(1)->Opcode()], addp->in(1)->_idx,
+                 NodeClassNames[addp->in(2)->Opcode()], addp->in(2)->_idx,
+                 NodeClassNames[addp->in(3)->Opcode()], addp->in(3)->_idx);
     }
   }
   NOT_PRODUCT(record_new2old(mach, leaf);)
