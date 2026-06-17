@@ -1,0 +1,40 @@
+Description: Dump the full inner XOR chain structure immediately after
+reassociation creates it. Shows each chain element's value input type,
+confirming the chain is all-RShiftI before IGVN runs.
+
+Usage: Apply, rebuild hotspot, run with -XX:+PrintIdeal
+       -XX:CompileCommand=compileonly,...
+       Grep for [reassoc-chain] in output.
+
+--- a/src/hotspot/share/opto/loopnode.cpp
++++ b/src/hotspot/share/opto/loopnode.cpp
+@@ -5104,6 +5104,28 @@
+   phase->register_new_node(new_chain_head, loop_head);
+   phase->igvn().replace_node(chain_head, new_chain_head);
+
++  if (PrintIdeal) {
++    tty->print("[reassoc-chain] New chain head %d, inner chain result %d. Walking inner chain:\n",
++               new_chain_head->_idx, reassociated->_idx);
++    Node* cur = reassociated;
++    int depth = 0;
++    while (cur != nullptr && cur->Opcode() == opcode && depth < 20) {
++      Node* val = cur->in(1);
++      Node* next = cur->in(2);
++      if (next->Opcode() != opcode) {
++        val = cur->in(2);
++        next = cur->in(1);
++      }
++      if (next->Opcode() != opcode) {
++        tty->print("[reassoc-chain]   XorI(%d): %s(%d) ^ %s(%d)\n",
++                   cur->_idx,
++                   NodeClassNames[cur->in(1)->Opcode()], cur->in(1)->_idx,
++                   NodeClassNames[cur->in(2)->Opcode()], cur->in(2)->_idx);
++        break;
++      }
++      tty->print("[reassoc-chain]   XorI(%d): %s(%d) ^ chain\n",
++                 cur->_idx, NodeClassNames[val->Opcode()], val->_idx);
++      cur = next;
++      depth++;
++    }
++  }
+ }

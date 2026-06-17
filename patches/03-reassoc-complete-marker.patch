@@ -1,0 +1,18 @@
+Description: Print a marker line when the reassociation phase completes,
+so that RShiftI identity/ideal rule firings can be correlated with
+whether they happen before or after reassociation.
+
+Usage: Apply, rebuild hotspot, run with -XX:+PrintIdeal
+       -XX:CompileCommand=compileonly,...
+       Grep for [reassoc] in output.
+
+--- a/src/hotspot/share/opto/loopnode.cpp
++++ b/src/hotspot/share/opto/loopnode.cpp
+@@ -5516,6 +5516,9 @@
+       }
+     }
++    if (PrintIdeal) {
++      tty->print("[reassoc] === reassociation complete, IGVN will run next ===\n");
++    }
+   }
+ }

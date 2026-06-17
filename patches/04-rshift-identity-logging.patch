@@ -1,0 +1,23 @@
+Description: Log when the RShiftNode::IdentityIL() rule eliminates a
+sign-extension pattern (x << N) >> N. Shows the type range of x and
+the target range, confirming when this fires relative to reassociation.
+
+Usage: Apply, rebuild hotspot, run with -XX:+PrintIdeal
+       -XX:CompileCommand=compileonly,...
+       Grep for [identity-shift] in output.
+
+--- a/src/hotspot/share/opto/mulnode.cpp
++++ b/src/hotspot/share/opto/mulnode.cpp
+@@ -1253,6 +1253,12 @@
+       // Does actual value fit inside of mask?
+       if (lo <= t11->lo_as_long() && t11->hi_as_long() <= hi) {
++        if (PrintIdeal) {
++          tty->print("[identity-shift] Eliminating %s(%d) << %d >> %d: type [%ld, %ld] fits [%ld, %ld]. Returning %s(%d)\n",
++                     NodeClassNames[in(1)->in(1)->Opcode()], in(1)->in(1)->_idx,
++                     count, count,
++                     (long)t11->lo_as_long(), (long)t11->hi_as_long(),
++                     (long)lo, (long)hi,
++                     NodeClassNames[in(1)->in(1)->Opcode()], in(1)->in(1)->_idx);
++        }
+         return in(1)->in(1);      // Then shifting is a nop
+       }

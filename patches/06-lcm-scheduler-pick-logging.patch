@@ -1,0 +1,42 @@
+Description: Log every node picked by schedule_local() in LCM, showing
+the winning node's name, choice/latency/score values, req() count,
+and ready list size. For XorI nodes, also dumps all input nodes.
+Shows scheduling order and score buildup that causes clustering vs
+interleaving.
+
+Usage: Apply, rebuild hotspot, run with -XX:+TraceOptoOutput
+       -XX:CompileCommand=compileonly,...
+       Grep for [sched] in output.
+
+--- a/src/hotspot/share/opto/lcm.cpp
++++ b/src/hotspot/share/opto/lcm.cpp
+@@ -708,6 +708,27 @@
+   guarantee(idx >= 0, "index should be set");
+   Node *n = worklist[(uint)idx];      // Get the winner
+
++  // Log every scheduling pick with full context
++  if (TraceOptoOutput && n->is_Mach()) {
++    int iop = n->as_Mach()->ideal_Opcode();
++    tty->print("[sched] %s(%d) choice=%d lat=%d score=%d(req=%d) ready=%d",
++               n->Name(), n->_idx, choice, latency, score, n->req(),
++               worklist.size());
++    // For XorI nodes, dump inputs to understand what feeds the chain
++    if (iop == Op_XorI) {
++      tty->print(" inputs=[");
++      for (uint j = 0; j < n->req(); j++) {
++        if (j > 0) tty->print(", ");
++        Node* inp = n->in(j);
++        if (inp != nullptr) {
++          tty->print("%s(%d)", inp->is_Mach() ? NodeClassNames[inp->as_Mach()->ideal_Opcode()] : inp->Name(), inp->_idx);
++        } else {
++          tty->print("null");
++        }
++      }
++      tty->print("]");
++    }
++    tty->cr();
++  }
++
+   worklist.map((uint)idx, worklist.pop());     // Compress worklist
+   return n;
+ }

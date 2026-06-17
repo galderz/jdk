@@ -1,0 +1,21 @@
+Description: Log what values reassociate_chain() extracts at each chain level.
+Shows the ideal node type and ID for each left/right value extracted from
+the original XOR chain. Confirms ALL extracted values are RShiftI for both
+byte and short at extraction time.
+
+Usage: Apply, rebuild hotspot, run with -XX:CompileCommand=compileonly,...
+       Grep for [reassoc-extract] in output.
+
+--- a/src/hotspot/share/opto/loopnode.cpp
++++ b/src/hotspot/share/opto/loopnode.cpp
+@@ -5036,6 +5036,10 @@
+     right = reassociate_chain(add_opcode, node->in(2), phi, loop_head, phase);
+   }
+
++  tty->print("[reassoc-extract] left: %s(%d)  right: %s(%d)\n",
++             NodeClassNames[left->Opcode()], left->_idx,
++             NodeClassNames[right->Opcode()], right->_idx);
++
+   Node* reassoc = build_min_max(add_opcode, left, right, phase);
+
+   phase->register_new_node(reassoc, loop_head);

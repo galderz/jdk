@@ -1,0 +1,32 @@
+Description: Log the register pressure heuristic's score computation for
+key node types (XorI, MulI, AddI, RShiftI). Shows int_pressure,
+cur_pressure, high_pressure_limit, and score before/after the boost.
+Reveals why XorI gets score=4 (short) vs score=5 (byte).
+
+Usage: Apply, rebuild hotspot, run with -XX:+TraceOptoOutput
+       -XX:CompileCommand=compileonly,...
+       Grep for [sched-pressure] in output.
+
+--- a/src/hotspot/share/opto/lcm.cpp
++++ b/src/hotspot/share/opto/lcm.cpp
+@@ -677,7 +677,19 @@
+           if (_regalloc->_sched_int_pressure.current_pressure() > _regalloc->_sched_int_pressure.high_pressure_limit()) {
+             short int_pressure = (short)recalc_pressure_nodes[n->_idx];
++            if (TraceOptoOutput && n->is_Mach()) {
++              int iop = n->as_Mach()->ideal_Opcode();
++              if (iop == Op_XorI || iop == Op_MulI || iop == Op_AddI || iop == Op_RShiftI) {
++                tty->print("[sched-pressure] %s(%d) int_pressure=%d cur_pressure=%d limit=%d score_before=%d",
++                           NodeClassNames[iop], n->_idx, int_pressure,
++                           _regalloc->_sched_int_pressure.current_pressure(),
++                           _regalloc->_sched_int_pressure.high_pressure_limit(),
++                           n_score);
++              }
++            }
+             n_score = (int_pressure < 0) ? ((score + n_score) - int_pressure) : (int_pressure > 0) ? 1 : n_score;
++            if (TraceOptoOutput && n->is_Mach()) {
++              int iop = n->as_Mach()->ideal_Opcode();
++              if (iop == Op_XorI || iop == Op_MulI || iop == Op_AddI || iop == Op_RShiftI) {
++                tty->print(" score_after=%d\n", n_score);
++              }
++            }
+           }

@@ -1,0 +1,32 @@
+Description: Log when RShiftINode::Ideal() eliminates sign-extension on
+LoadS or LoadB nodes specifically. Shows the (LoadS << 16) >> 16 and
+(LoadB << 24) >> 24 simplification rules firing.
+
+Usage: Apply, rebuild hotspot, run with -XX:+PrintIdeal
+       -XX:CompileCommand=compileonly,...
+       Grep for [ideal-shift] in output.
+
+--- a/src/hotspot/share/opto/mulnode.cpp
++++ b/src/hotspot/share/opto/mulnode.cpp
+@@ -1322,6 +1322,10 @@
+   if (shift == 16 && left_shift_t->is_con(16)) {
+     Node *ld = shl->in(1);
+     if (ld->Opcode() == Op_LoadS) {
++      if (PrintIdeal) {
++        tty->print("[ideal-shift] (LoadS(%d) << 16) >> 16 → LoadS (RShiftI %d becomes identity)\n",
++                   ld->_idx, _idx);
++      }
+       set_req_X(1, ld, phase);
+       set_req_X(2, phase->intcon(0), phase);
+       return this;
+@@ -1341,6 +1345,10 @@
+   if (shift == 24 && left_shift_t->is_con(24)) {
+     Node *ld = shl->in(1);
+     if (ld->Opcode() == Op_LoadB) {
++      if (PrintIdeal) {
++        tty->print("[ideal-shift] (LoadB(%d) << 24) >> 24 → LoadB (RShiftI %d becomes identity)\n",
++                   ld->_idx, _idx);
++      }
+       set_req_X(1, ld, phase);
+       set_req_X(2, phase->intcon(0), phase);
+       return this;

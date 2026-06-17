@@ -1,0 +1,40 @@
+Description: Log which instruction rule and memory operand the ADLC matcher
+selects for each LoadS/LoadB node. Shows the exact operand instance name
+(e.g., INDPOSINDEXSCALEOFFSET vs INDINDEXOFFSET) chosen from the memory
+opclass, proving which pattern folded ConvI2L and which didn't.
+
+Usage: Apply, rebuild hotspot, run with -XX:+PrintIdeal
+       -XX:CompileCommand=compileonly,...
+       Grep for [matcher] in output.
+
+--- a/src/hotspot/share/opto/matcher.cpp
++++ b/src/hotspot/share/opto/matcher.cpp
+@@ -1716,6 +1716,15 @@
+   Node *leaf = s->_leaf;
+   NOT_PRODUCT(record_new2old(mach, leaf);)
+
++  // Log instruction rule selection for Load nodes
++  if (PrintIdeal && leaf->is_Load()) {
++    int ideal_op = leaf->Opcode();
++    if (ideal_op == Op_LoadS || ideal_op == Op_LoadB) {
++      tty->print("[matcher] %s(%d) → instr rule: %s, result operand: %s\n",
++                 NodeClassNames[ideal_op], leaf->_idx,
++                 _ruleName[rule], _ruleName[_reduceOp[rule]]);
++    }
++  }
++
+   // Check for instruction or instruction chain rule
+   if( rule >= _END_INST_CHAIN_RULE || rule < _BEGIN_INST_CHAIN_RULE ) {
+
+--- also in ReduceInst_Interior, after mach->_opnds[num_opnds++] = ... ---
++      // Log memory operand selection for Load nodes
++      if (PrintIdeal && s->_leaf->is_Load()) {
++        int ideal_op = s->_leaf->Opcode();
++        if (ideal_op == Op_LoadS || ideal_op == Op_LoadB) {
++          tty->print("[matcher]   operand[%d]: class=%s instance=%s (rule %d→%d) leaf=%s(%d)\n",
++                     num_opnds-1,
++                     _ruleName[op], _ruleName[opnd_class_instance],
++                     op, newrule,
++                     NodeClassNames[newstate->_leaf->Opcode()], newstate->_leaf->_idx);
++        }
++      }
