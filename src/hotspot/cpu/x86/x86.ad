@@ -5733,7 +5733,15 @@ operand indIndexScaleOffset(any_RegP reg, immL32 off, rRegL lreg, immI2 scale)
 operand indPosIndexOffset(any_RegP reg, immL32 off, rRegI idx)
 %{
   constraint(ALLOC_IN_RC(ptr_reg));
-  predicate(n->in(2)->in(3)->as_Type()->type()->is_long()->_lo >= 0);
+  predicate(({
+    bool result = n->in(2)->in(3)->as_Type()->type()->is_long()->_lo >= 0;
+    if (UseNewCode) {
+      tty->print("[ad-predicate] indPosIndexOffset AddP(%d): _lo=%ld → %s\n",
+                 n->_idx,
+                 (long)n->in(2)->in(3)->as_Type()->type()->is_long()->_lo,
+                 _result ? "PASS" : "FAIL");
+    }
+  }));
   match(AddP (AddP reg (ConvI2L idx)) off);
 
   op_cost(10);
