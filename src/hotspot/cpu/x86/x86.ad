@@ -5739,8 +5739,9 @@ operand indPosIndexOffset(any_RegP reg, immL32 off, rRegI idx)
       tty->print("[ad-predicate] indPosIndexOffset AddP(%d): _lo=%ld → %s\n",
                  n->_idx,
                  (long)n->in(2)->in(3)->as_Type()->type()->is_long()->_lo,
-                 _result ? "PASS" : "FAIL");
+                 result ? "PASS" : "FAIL");
     }
+    result;
   }));
   match(AddP (AddP reg (ConvI2L idx)) off);
 
