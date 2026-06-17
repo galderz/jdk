@@ -1892,7 +1892,7 @@ uint Matcher::ReduceInst_Interior( State *s, int rule, Node *&mem, MachNode *mac
     if (newrule < NUM_OPERANDS) { // Operand/operandClass or internalOp/instruction?
       // Operand/operandClass
       // Insert operand into array of operands for this instruction
-      if (PrintIdeal && s->_leaf->is_Load()) {
+      if (UseNewCode && s->_leaf->is_Load()) {
         int ideal_op = s->_leaf->Opcode();
         if (ideal_op == Op_LoadS || ideal_op == Op_LoadB) {
           tty->print("[matcher]   operand[%d]: class=%s instance=%s\n",
