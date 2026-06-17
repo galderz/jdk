@@ -1717,8 +1717,9 @@ MachNode *Matcher::ReduceInst( State *s, int rule, Node *&mem ) {
   if (UseNewCode && leaf->is_Load()) {
     int ideal_op = leaf->Opcode();
     if (ideal_op == Op_LoadS || ideal_op == Op_LoadB) {
-      tty->print("[matcher] %s(%d) → instr rule: %s\n",
-                 NodeClassNames[ideal_op], leaf->_idx, _ruleName[rule]);
+      tty->print("[matcher] %s(%d) → instr rule: %s, addr=AddP(%d)\n",
+                 NodeClassNames[ideal_op], leaf->_idx, _ruleName[rule],
+                 leaf->in(MemNode::Address)->_idx);
     }
   }
   NOT_PRODUCT(record_new2old(mach, leaf);)
