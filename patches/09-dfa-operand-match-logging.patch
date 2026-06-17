@@ -1,0 +1,74 @@
+Description: Log when the DFA evaluates the indPosIndexOffset and
+indIndexOffset operand matches for AddP nodes. Shows whether:
+(a) The structural match (ADDP_ANY_REGP__CONVI2L_RREGI_ vs ADDP_ANY_REGP_RREGL)
+    succeeds or fails for each pattern
+(b) The non-negativity predicate (_lo >= 0) passes or fails
+
+Apply to the GENERATED file, not the source:
+  build/linux-x86_64-server-fastdebug/hotspot/variant-server/gensrc/adfiles/dfa_x86.cpp
+
+WARNING: This file is regenerated on rebuild. You must re-apply this
+patch after each 'make hotspot'. To make it permanent, modify x86.ad
+instead (see below).
+
+Usage: Apply, rebuild with 'make CONF=... hotspot JOBS=...'
+       Run with -XX:+PrintIdeal -XX:CompileCommand=compileonly,...
+       Grep for [dfa-match] in output.
+
+--- a/build/.../gensrc/adfiles/dfa_x86.cpp
++++ b/build/.../gensrc/adfiles/dfa_x86.cpp
+
+Around line 3061 (indPosIndexOffset match), ADD BEFORE the if statement:
+
+    // === LOGGING: indPosIndexOffset match attempt ===
+    if (PrintIdeal) {
+      bool struct_ok = STATE__VALID_CHILD(_kids[0], _ADDP_ANY_REGP__CONVI2L_RREGI_) &&
+                       STATE__VALID_CHILD(_kids[1], IMML32);
+      if (struct_ok) {
+        bool pred_ok = n->in(2)->in(3)->as_Type()->type()->is_long()->_lo >= 0;
+        tty->print("[dfa-match] AddP(%d): indPosIndexOffset structural=YES predicate(%s) _lo=%ld\n",
+                   n->_idx, pred_ok ? "PASS" : "FAIL",
+                   (long)n->in(2)->in(3)->as_Type()->type()->is_long()->_lo);
+      } else {
+        tty->print("[dfa-match] AddP(%d): indPosIndexOffset structural=NO"
+                   " (kids[0] valid for CONVI2L_RREGI=%d, kids[1] valid for IMML32=%d)\n",
+                   n->_idx,
+                   STATE__VALID_CHILD(_kids[0], _ADDP_ANY_REGP__CONVI2L_RREGI_),
+                   STATE__VALID_CHILD(_kids[1], IMML32));
+      }
+    }
+    // === END LOGGING ===
+
+Around line 3270 (indIndexOffset match), ADD BEFORE the if statement:
+
+    // === LOGGING: indIndexOffset match attempt ===
+    if (PrintIdeal) {
+      bool struct_ok = STATE__VALID_CHILD(_kids[0], _ADDP_ANY_REGP_RREGL) &&
+                       STATE__VALID_CHILD(_kids[1], IMML32);
+      if (struct_ok) {
+        tty->print("[dfa-match] AddP(%d): indIndexOffset structural=YES (no predicate, takes rRegL)\n",
+                   n->_idx);
+      }
+    }
+    // === END LOGGING ===
+
+---
+
+ALTERNATIVE: To make this permanent (survives rebuild), modify x86.ad
+at line 5736. Replace the predicate with a logging wrapper. Note: the
+ADLC predicate must be a single C++ expression, so use a GNU statement
+expression ({...}):
+
+  predicate(({
+    bool _result = n->in(2)->in(3)->as_Type()->type()->is_long()->_lo >= 0;
+    if (PrintIdeal) {
+      tty->print("[ad-predicate] indPosIndexOffset AddP(%d): _lo=%ld → %s\n",
+                 n->_idx,
+                 (long)n->in(2)->in(3)->as_Type()->type()->is_long()->_lo,
+                 _result ? "PASS" : "FAIL");
+    }
+    _result;
+  }));
+
+This GNU extension works with GCC/Clang but is not standard C++.
+If the ADLC rejects it, use the dfa_x86.cpp approach above instead.
