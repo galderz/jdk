@@ -708,6 +708,31 @@ Node* PhaseCFG::select(
   guarantee(idx >= 0, "index should be set");
   Node *n = worklist[(uint)idx];      // Get the winner
 
+  // Log every scheduling pick with full context
+  if (UseNewCode && n->is_Mach()) {
+    int iop = n->as_Mach()->ideal_Opcode();
+    tty->print("[sched] %s(%d) choice=%d lat=%d score=%d(req=%d) ready=%d",
+      n->Name(), n->_idx, choice, latency, score, n->req(),
+      worklist.size());
+    // For XorI nodes, dump inputs to understand what feeds the chain
+    if (iop == Op_XorI) {
+      tty->print(" inputs=[");
+      for (uint j = 0; j < n->req(); j++) {
+        if (j > 0) {
+          tty->print(", ");
+        }
+        Node* inp = n->in(j);
+        if (inp != nullptr) {
+          tty->print("%s(%d)", inp->is_Mach() ? NodeClassNames[inp->as_Mach()->ideal_Opcode()] : inp->Name(), inp->_idx);
+        } else {
+          tty->print("null");
+        }
+      }
+      tty->print("]");
+    }
+    tty->cr();
+  }
+
   worklist.map((uint)idx, worklist.pop());     // Compress worklist
   return n;
 }
