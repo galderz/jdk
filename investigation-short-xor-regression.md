@@ -591,11 +591,39 @@ undoes reassociation, but keeps register pressure low).
   convert the int loop counter. This ConvI2L lives in the loop body block →
   loads depend on it → `ready_cnt=1`.
 
-This difference is NOT visible in `PrintIdeal` (both have ConvI2L in the
-ideal graph). It emerges during **instruction selection** when the ideal
-nodes are matched to x86 machine nodes via the `.ad` file rules. The scaled
-SIB addressing mode for short folds the int→long conversion into the load
-instruction, while unscaled byte addressing requires a separate ConvI2L.
+This difference is NOT visible in `PrintIdeal` (both have ConvI2L with type
+`#long:>=0` in the ideal graph). It emerges during **instruction selection**
+when the ideal nodes are matched to x86 machine nodes via the `.ad` file
+rules.
+
+The matching rules are in `x86.ad` (lines 5685-5761). Key operand patterns:
+
+```
+// SHORT matches this (folds ConvI2L + LShiftL into SIB encoding):
+operand indPosIndexScaleOffset(any_RegP reg, immL32 off, rRegI idx, immI2 scale)
+  match(AddP (AddP reg (LShiftL (ConvI2L idx) scale)) off);
+  // Takes rRegI idx (int!) — ConvI2L is consumed by the operand match
+  // Predicate: n->in(2)->in(3)->in(1)->as_Type()->type()->is_long()->_lo >= 0
+
+// BYTE's address tree shape doesn't match indPosIndexOffset:
+operand indPosIndexOffset(any_RegP reg, immL32 off, rRegI idx)
+  match(AddP (AddP reg (ConvI2L idx)) off);
+  // Predicate: n->in(2)->in(3)->as_Type()->type()->is_long()->_lo >= 0
+```
+
+For SHORT: the address tree is `AddP(AddP(base, LShiftL(ConvI2L(phi), 1)), off)`.
+This matches `indPosIndexScaleOffset` perfectly — ConvI2L is folded, no
+separate machine node emitted.
+
+For BYTE: the address tree for unscaled access `AddP(AddP(base, ConvI2L(phi)), off)`
+should match `indPosIndexOffset`, but in the standard compilation the address
+tree has a different shape (possibly different AddP nesting from loop unrolling)
+that causes the predicate to fail. The matcher falls back to `indIndexOffset`
+which requires `rRegL` — an explicit `convI2L_reg_reg` machine node.
+
+Verified by examining machine node inputs in `-XX:+TraceOptoPipelining`:
+- SHORT B61 loads: idx input is `Phi(140)` (int, pre-scheduled) → `ready_cnt=0`
+- BYTE B61 loads: idx input is `convI2L_reg_reg(359)` (in-block) → `ready_cnt=1`
 
 To verify: run with `-XX:+TraceOptoPipelining -XX:CompileCommand=compileonly,...`
 via JMH. Search for the block with 48 loads and 16 xorI nodes. Check
