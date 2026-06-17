@@ -1714,6 +1714,13 @@ MachNode *Matcher::ReduceInst( State *s, int rule, Node *&mem ) {
   mach->_opnds[0] = s->MachOperGenerator(_reduceOp[rule]);
   assert( mach->_opnds[0] != nullptr, "Missing result operand" );
   Node *leaf = s->_leaf;
+  if (UseNewCode && leaf->is_Load()) {
+    int ideal_op = leaf->Opcode();
+    if (ideal_op == Op_LoadS || ideal_op == Op_LoadB) {
+      tty->print("[matcher] %s(%d) → instr rule: %s\n",
+                 NodeClassNames[ideal_op], leaf->_idx, _ruleName[rule]);
+    }
+  }
   NOT_PRODUCT(record_new2old(mach, leaf);)
   // Check for instruction or instruction chain rule
   if( rule >= _END_INST_CHAIN_RULE || rule < _BEGIN_INST_CHAIN_RULE ) {
@@ -1885,6 +1892,13 @@ uint Matcher::ReduceInst_Interior( State *s, int rule, Node *&mem, MachNode *mac
     if (newrule < NUM_OPERANDS) { // Operand/operandClass or internalOp/instruction?
       // Operand/operandClass
       // Insert operand into array of operands for this instruction
+      if (PrintIdeal && s->_leaf->is_Load()) {
+        int ideal_op = s->_leaf->Opcode();
+        if (ideal_op == Op_LoadS || ideal_op == Op_LoadB) {
+          tty->print("[matcher]   operand[%d]: class=%s instance=%s\n",
+                     num_opnds-1, _ruleName[op], _ruleName[opnd_class_instance]);
+        }
+      }
       mach->_opnds[num_opnds++] = newstate->MachOperGenerator(opnd_class_instance);
       ReduceOper(newstate, newrule, mem, mach);
 
