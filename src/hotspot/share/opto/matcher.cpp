@@ -1594,7 +1594,19 @@ Node* Matcher::Label_Root(const Node* n, State* svec, Node* control, Node*& mem)
     s->_kids[1] = nullptr;
     s->_leaf = m;
 
-    // Check for leaves of the State Tree; things that cannot be a part of
+    // === ADD THIS LOGGING ===
+    if (UseNewCode && (m->Opcode() == Op_ConvI2L || m->Opcode() == Op_LShiftL)) {
+      bool shared = is_shared(m);
+      bool into_reg = match_into_reg(n, m, control, i, shared);
+      tty->print("[matcher-share] parent=%s(%d) child=%s(%d) is_shared=%d match_into_reg=%d outcnt=%d → %s\n",
+                 NodeClassNames[n->Opcode()], n->_idx,
+                 NodeClassNames[m->Opcode()], m->_idx,
+                 shared, into_reg, m->outcnt(),
+                 into_reg ? "REGISTER (standalone)" : "FOLD (into parent tree)");
+    }
+    // === END LOGGING ===
+
+    // // Check for leaves of the State Tree; things that cannot be a part of
     // the current tree.  If it finds any, that value is matched as a
     // register operand.  If not, then the normal matching is used.
     if( match_into_reg(n, m, control, i, is_shared(m)) ||
