@@ -5910,7 +5910,17 @@ operand indIndexScaleOffsetNarrow(rRegN reg, immL32 off, rRegL lreg, immI2 scale
 operand indPosIndexOffsetNarrow(rRegN reg, immL32 off, rRegI idx)
 %{
   constraint(ALLOC_IN_RC(ptr_reg));
-  predicate(CompressedOops::shift() == 0 && n->in(2)->in(3)->as_Type()->type()->is_long()->_lo >= 0);
+  predicate(({
+    bool result = CompressedOops::shift() == 0 && n->in(2)->in(3)->as_Type()->type()->is_long()->_lo >= 0;
+    if (UseNewCode) {
+      tty->print("[ad-predicate] indPosIndexOffsetNarrow AddP(%d): CompressedOops::shift()=%d _lo=%ld → %s\n",
+                 n->_idx,
+                 CompressedOops::shift(),
+                 (long)n->in(2)->in(3)->as_Type()->type()->is_long()->_lo,
+                 result ? "PASS" : "FAIL");
+    }
+    result;
+  }));
   match(AddP (AddP (DecodeN reg) (ConvI2L idx)) off);
 
   op_cost(10);
