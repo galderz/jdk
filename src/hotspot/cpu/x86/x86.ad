@@ -4085,6 +4085,11 @@ bool Matcher::pd_clone_node(Node* n, Node* m, Matcher::MStack& mstack) {
 // to be subsumed into complex addressing expressions or compute them
 // into registers?
 bool Matcher::pd_clone_address_expressions(AddPNode* m, Matcher::MStack& mstack, VectorSet& address_visited) {
+  // === ADD LOGGING ===
+  if (UseNewCode) {
+    tty->print("[pd-clone] AddP(%d)\n", m->_idx);
+  }
+  // === LOGGING ===
   Node *off = m->in(AddPNode::Offset);
   if (off->is_Con()) {
     address_visited.test_set(m->_idx); // Flag as address_visited
