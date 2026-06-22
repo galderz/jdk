@@ -3948,6 +3948,13 @@ static bool clone_shift(Node* shift, Matcher* matcher, Matcher::MStack& mstack, 
         // Are there other uses besides address expressions?
         !matcher->is_visited(conv)) {
       address_visited.set(conv->_idx); // Flag as address_visited
+      // === ADD LOGGING ===
+      if (UseNewCode) {
+        tty->print("[clone-shift] LShiftL(%d) protecting ConvI2L(%d) via address_visited"
+                   " (outcnt=%d, is_visited=%d)\n",
+                   shift->_idx, conv->_idx, conv->outcnt(), matcher->is_visited(conv));
+      }
+      // === LOGGING ===
       mstack.push(conv->in(1), Matcher::Pre_Visit);
     } else {
       mstack.push(conv, Matcher::Pre_Visit);

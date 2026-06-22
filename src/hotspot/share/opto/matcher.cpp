@@ -1608,8 +1608,8 @@ Node* Matcher::Label_Root(const Node* n, State* svec, Node* control, Node*& mem)
                    m->Name(), m->_idx, m->outcnt());
         for (DUIterator_Fast zmax, z = m->fast_outs(zmax); z < zmax; z++) {
           Node* use = m->fast_out(z);
-          tty->print("[matcher-find-shared]   → %s(%d)\n",
-                     use->Name(), use->_idx);
+          tty->print("[matcher-find-shared]   → %s(%d) (classname=%s)\n",
+                     use->Name(), use->_idx, NodeClassNames[use->Opcode()]);
         }
       }
     }
@@ -2108,8 +2108,8 @@ void Matcher::find_shared(Node* n) {
                      n->Name(), n->_idx, n->outcnt());
           for (DUIterator_Fast imax, i = n->fast_outs(imax); i < imax; i++) {
             Node* use = n->fast_out(i);
-            tty->print("[find-shared]   → %s(%d)\n",
-                       use->Name(), use->_idx);
+            tty->print("[find-shared]   → %s(%d) (classname=%s)\n",
+                       use->Name(), use->_idx, NodeClassNames[use->Opcode()]);
           }
         }
         if (n->is_DecodeNarrowPtr()) {
@@ -2156,6 +2156,18 @@ void Matcher::find_shared(Node* n) {
           }
         }   // if( mem_op &&
         mstack.push(m, Pre_Visit);
+        // === ADD LOGGING ===
+        if (UseNewCode && (m->Opcode() == Op_ConvI2L || m->Opcode() == Op_LShiftL)) {
+          tty->print("[find-shared-push] %s(%d) pushed by parent=%s(%d) (outcnt=%d, is_visited=%d, address_visited=%d)\n",
+                     m->Name(),
+                     m->_idx,
+                     NodeClassNames[n->Opcode()],
+                     n->_idx,
+                     m->outcnt(),
+                     is_visited(m),
+                     address_visited.test(m->_idx));
+        }
+        // === END LOGGING ===
       }     // for(int i = ...)
     }
     else if (nstate == Alt_Post_Visit) {
