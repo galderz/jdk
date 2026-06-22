@@ -2109,7 +2109,7 @@ void Matcher::find_shared(Node* n) {
           for (DUIterator_Fast imax, i = n->fast_outs(imax); i < imax; i++) {
             Node* use = n->fast_out(i);
             tty->print("[find-shared]   → %s(%d) (classname=%s)\n",
-                       use->Name(), use->_idx, NodeClassNames[use->Opcode()]);
+                       NodeClassNames[use->Opcode()], use->_idx, NodeClassNames[use->Opcode()]);
           }
         }
         if (n->is_DecodeNarrowPtr()) {
@@ -2159,7 +2159,7 @@ void Matcher::find_shared(Node* n) {
         // === ADD LOGGING ===
         if (UseNewCode && (m->Opcode() == Op_ConvI2L || m->Opcode() == Op_LShiftL)) {
           tty->print("[find-shared-push] %s(%d) pushed by parent=%s(%d) (outcnt=%d, is_visited=%d, address_visited=%d)\n",
-                     m->Name(),
+                     NodeClassNames[m->Opcode()],
                      m->_idx,
                      NodeClassNames[n->Opcode()],
                      n->_idx,
