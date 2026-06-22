@@ -4086,9 +4086,9 @@ bool Matcher::pd_clone_node(Node* n, Node* m, Matcher::MStack& mstack) {
 // into registers?
 bool Matcher::pd_clone_address_expressions(AddPNode* m, Matcher::MStack& mstack, VectorSet& address_visited) {
   // === ADD LOGGING ===
-  if (UseNewCode) {
-    tty->print("[pd-clone] AddP(%d)\n", m->_idx);
-  }
+  // if (UseNewCode) {
+  //   tty->print("[pd-clone] AddP(%d)\n", m->_idx);
+  // }
   // === LOGGING ===
   Node *off = m->in(AddPNode::Offset);
   if (off->is_Con()) {
@@ -4108,10 +4108,11 @@ bool Matcher::pd_clone_address_expressions(AddPNode* m, Matcher::MStack& mstack,
       Node *off = adr->in(AddPNode::Offset);
       if (!clone_shift(off, this, mstack, address_visited)) {
         mstack.push(off, Pre_Visit);
-      } else if (off->Opcode() == Op_ConvI2L &&
-                 off->as_Type()->type()->is_long()->_lo >= 0 &&
-                 !is_visited(off)) {
-        tty->print("[plain-conv] matches\n");
+      }
+      if (off->Opcode() == Op_ConvI2L &&
+          off->as_Type()->type()->is_long()->_lo >= 0 &&
+          !is_visited(off)) {
+          tty->print("[plain-conv] ConvI2L(%d) naked match\n", off->_idx);
       }
       mstack.push(adr->in(AddPNode::Address), Pre_Visit);
       mstack.push(adr->in(AddPNode::Base), Pre_Visit);
