@@ -4124,6 +4124,10 @@ bool Matcher::pd_clone_address_expressions(AddPNode* m, Matcher::MStack& mstack,
     mstack.push(m->in(AddPNode::Address), Pre_Visit);
     mstack.push(m->in(AddPNode::Base), Pre_Visit);
     return true;
+  } else if (off->Opcode() == Op_ConvI2L &&
+             off->as_Type()->type()->is_long()->_lo >= 0 &&
+             !is_visited(off)) {
+    tty->print("[naked-conv] ConvI2L(%d) naked match\n", off->_idx);
   }
   return false;
 }
