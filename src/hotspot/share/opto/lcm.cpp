@@ -712,7 +712,7 @@ Node* PhaseCFG::select(
   if (UseNewCode && n->is_Mach()) {
     int iop = n->as_Mach()->ideal_Opcode();
     tty->print("[sched] %s(%d) choice=%d lat=%d score=%d(req=%d) ready=%d",
-      n->Name(), n->_idx, choice, latency, score, n->req(),
+      NodeClassNames[n->Opcode()], n->_idx, choice, latency, score, n->req(),
       worklist.size());
     // For XorI nodes, dump inputs to understand what feeds the chain
     if (iop == Op_XorI) {
@@ -723,7 +723,7 @@ Node* PhaseCFG::select(
         }
         Node* inp = n->in(j);
         if (inp != nullptr) {
-          tty->print("%s(%d)", inp->is_Mach() ? NodeClassNames[inp->as_Mach()->ideal_Opcode()] : inp->Name(), inp->_idx);
+          tty->print("%s(%d)", inp->is_Mach() ? NodeClassNames[inp->as_Mach()->ideal_Opcode()] : NodeClassNames[inp->Opcode()], inp->_idx);
         } else {
           tty->print("null");
         }
