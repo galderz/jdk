@@ -4105,16 +4105,9 @@ bool Matcher::pd_clone_address_expressions(AddPNode* m, Matcher::MStack& mstack,
         // Are there other uses besides address expressions?
         !is_visited(adr)) {
       address_visited.set(adr->_idx); // Flag as address_visited
-      Node *off = adr->in(AddPNode::Offset);
-      if (!clone_shift(off, this, mstack, address_visited)) {
-        mstack.push(off, Pre_Visit);
-      }
-      if (off->Opcode() == Op_ConvI2L &&
-          off->as_Type()->type()->is_long()->_lo >= 0 &&
-          !is_visited(off)) {
-          tty->print("[plain-conv] ConvI2L(%d) naked match\n", off->_idx);
-          address_visited.set(off->_idx); // Flag as address_visited
-          mstack.push(off->in(1), Pre_Visit);
+      Node *shift = adr->in(AddPNode::Offset);
+      if (!clone_shift(shift, this, mstack, address_visited)) {
+        mstack.push(shift, Pre_Visit);
       }
       mstack.push(adr->in(AddPNode::Address), Pre_Visit);
       mstack.push(adr->in(AddPNode::Base), Pre_Visit);
