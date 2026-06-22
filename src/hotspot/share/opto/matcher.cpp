@@ -1607,7 +1607,7 @@ Node* Matcher::Label_Root(const Node* n, State* svec, Node* control, Node*& mem)
         tty->print("[matcher-find-shared] ConvI2L(%d) marked SHARED (outcnt=%d). Users:\n",
                    m->_idx, m->outcnt());
         for (DUIterator_Fast zmax, z = m->fast_outs(zmax); z < zmax; z++) {
-          Node* use = n->fast_out(z);
+          Node* use = m->fast_out(z);
           tty->print("[matcher-find-shared]   → %s(%d)\n",
                      NodeClassNames[use->Opcode()], use->_idx);
         }
