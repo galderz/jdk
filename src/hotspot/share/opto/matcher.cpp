@@ -1608,8 +1608,8 @@ Node* Matcher::Label_Root(const Node* n, State* svec, Node* control, Node*& mem)
                    m->_idx, m->outcnt());
         for (DUIterator_Fast zmax, z = m->fast_outs(zmax); z < zmax; z++) {
           Node* use = m->fast_out(z);
-          tty->print("[matcher-find-shared]   → %s(%d)\n",
-                     NodeClassNames[use->Opcode()], use->_idx);
+          tty->print("[matcher-find-shared]   → %s(%d) %s(%d)\n",
+                     NodeClassNames[use->Opcode()], use->_idx, use->Name(), use->_idx);
         }
       }
     }
@@ -2108,8 +2108,8 @@ void Matcher::find_shared(Node* n) {
                      n->_idx, n->outcnt());
           for (DUIterator_Fast imax, i = n->fast_outs(imax); i < imax; i++) {
             Node* use = n->fast_out(i);
-            tty->print("[find-shared]   → %s(%d)\n",
-                       NodeClassNames[use->Opcode()], use->_idx);
+            tty->print("[find-shared]   → %s(%d) %s(%d)\n",
+                       NodeClassNames[use->Opcode()], use->_idx, use->Name(), use->_idx);
           }
         }
         if (n->is_DecodeNarrowPtr()) {
