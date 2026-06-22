@@ -1605,11 +1605,11 @@ Node* Matcher::Label_Root(const Node* n, State* svec, Node* control, Node*& mem)
                  into_reg ? "REGISTER (standalone)" : "FOLD (into parent tree)");
       if (m->Opcode() == Op_ConvI2L || m->Opcode() == Op_LShiftL) {
         tty->print("[matcher-find-shared] %s(%d) marked SHARED (outcnt=%d). Users:\n",
-                   m->Name(), m->_idx, m->outcnt());
+                   NodeClassNames[m->Opcode()], m->_idx, m->outcnt());
         for (DUIterator_Fast zmax, z = m->fast_outs(zmax); z < zmax; z++) {
           Node* use = m->fast_out(z);
           tty->print("[matcher-find-shared]   → %s(%d) (classname=%s)\n",
-                     use->Name(), use->_idx, NodeClassNames[use->Opcode()]);
+                     NodeClassNames[use->Opcode()], use->_idx, NodeClassNames[use->Opcode()]);
         }
       }
     }
@@ -1759,7 +1759,7 @@ MachNode *Matcher::ReduceInst( State *s, int rule, Node *&mem ) {
           if (child != nullptr) {
             const char* name = child->is_Mach()
                 ? NodeClassNames[child->as_Mach()->ideal_Opcode()]
-                : child->Name();
+                : NodeClassNames[child->Opcode()];
             tty->print(" in(%d)=%s(%d)", k, name, child->_idx);
           }
         }
@@ -2105,7 +2105,7 @@ void Matcher::find_shared(Node* n) {
         set_shared(n);       // Flag as shared and
         if (UseNewCode && (n->Opcode() == Op_ConvI2L || n->Opcode() == Op_LShiftL)) {
           tty->print("[find-shared] %s(%d) marked SHARED (outcnt=%d). Users:\n",
-                     n->Name(), n->_idx, n->outcnt());
+                     NodeClassNames[n->Opcode()], n->_idx, n->outcnt());
           for (DUIterator_Fast imax, i = n->fast_outs(imax); i < imax; i++) {
             Node* use = n->fast_out(i);
             tty->print("[find-shared]   → %s(%d) (classname=%s)\n",
