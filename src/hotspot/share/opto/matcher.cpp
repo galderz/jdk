@@ -1603,6 +1603,15 @@ Node* Matcher::Label_Root(const Node* n, State* svec, Node* control, Node*& mem)
                  NodeClassNames[m->Opcode()], m->_idx,
                  shared, into_reg, m->outcnt(),
                  into_reg ? "REGISTER (standalone)" : "FOLD (into parent tree)");
+      if (m->Opcode() == Op_ConvI2L) {
+        tty->print("[matcher-find-shared] ConvI2L(%d) marked SHARED (outcnt=%d). Users:\n",
+                   m->_idx, m->outcnt());
+        for (DUIterator_Fast zmax, z = m->fast_outs(zmax); z < zmax; z++) {
+          Node* use = n->fast_out(z);
+          tty->print("[matcher-find-shared]   → %s(%d)\n",
+                     NodeClassNames[use->Opcode()], use->_idx);
+        }
+      }
     }
     // === END LOGGING ===
 
