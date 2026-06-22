@@ -2094,6 +2094,15 @@ void Matcher::find_shared(Node* n) {
         // Node is shared and has no reason to clone.  Flag it as shared.
         // This causes it to match into a register for the sharing.
         set_shared(n);       // Flag as shared and
+        if (UseNewCode && (n->Opcode() == Op_ConvI2L)) {
+          tty->print("[find-shared] ConvI2L(%d) marked SHARED (outcnt=%d). Users:\n",
+                     n->_idx, n->outcnt());
+          for (DUIterator_Fast imax, i = n->fast_outs(imax); i < imax; i++) {
+            Node* use = n->fast_out(i);
+            tty->print("[find-shared]   → %s(%d)\n",
+                       NodeClassNames[use->Opcode()], use->_idx);
+          }
+        }
         if (n->is_DecodeNarrowPtr()) {
           // Oop field/array element loads must be shared but since
           // they are shared through a DecodeN they may appear to have
