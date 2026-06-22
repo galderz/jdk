@@ -1603,13 +1603,13 @@ Node* Matcher::Label_Root(const Node* n, State* svec, Node* control, Node*& mem)
                  NodeClassNames[m->Opcode()], m->_idx,
                  shared, into_reg, m->outcnt(),
                  into_reg ? "REGISTER (standalone)" : "FOLD (into parent tree)");
-      if (m->Opcode() == Op_ConvI2L) {
-        tty->print("[matcher-find-shared] ConvI2L(%d) marked SHARED (outcnt=%d). Users:\n",
-                   m->_idx, m->outcnt());
+      if (m->Opcode() == Op_ConvI2L || m->Opcode() == Op_LShiftL) {
+        tty->print("[matcher-find-shared] %s(%d) marked SHARED (outcnt=%d). Users:\n",
+                   m->Name(), m->_idx, m->outcnt());
         for (DUIterator_Fast zmax, z = m->fast_outs(zmax); z < zmax; z++) {
           Node* use = m->fast_out(z);
-          tty->print("[matcher-find-shared]   → %s(%d) %s(%d)\n",
-                     NodeClassNames[use->Opcode()], use->_idx, use->Name(), use->_idx);
+          tty->print("[matcher-find-shared]   → %s(%d)\n",
+                     use->Name(), use->_idx);
         }
       }
     }
@@ -2103,13 +2103,13 @@ void Matcher::find_shared(Node* n) {
         // Node is shared and has no reason to clone.  Flag it as shared.
         // This causes it to match into a register for the sharing.
         set_shared(n);       // Flag as shared and
-        if (UseNewCode && (n->Opcode() == Op_ConvI2L)) {
-          tty->print("[find-shared] ConvI2L(%d) marked SHARED (outcnt=%d). Users:\n",
-                     n->_idx, n->outcnt());
+        if (UseNewCode && (n->Opcode() == Op_ConvI2L || n->Opcode() == Op_LShiftL)) {
+          tty->print("[find-shared] %s(%d) marked SHARED (outcnt=%d). Users:\n",
+                     n->Name(), n->_idx, n->outcnt());
           for (DUIterator_Fast imax, i = n->fast_outs(imax); i < imax; i++) {
             Node* use = n->fast_out(i);
-            tty->print("[find-shared]   → %s(%d) %s(%d)\n",
-                       NodeClassNames[use->Opcode()], use->_idx, use->Name(), use->_idx);
+            tty->print("[find-shared]   → %s(%d)\n",
+                       use->Name(), use->_idx);
           }
         }
         if (n->is_DecodeNarrowPtr()) {
