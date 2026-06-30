@@ -263,6 +263,10 @@ void SuperWord::unrolling_analysis(const VLoop &vloop, int &local_loop_unroll_fa
 }
 
 bool VLoopReductions::is_reduction(const Node* n) {
+  if (UseNewCode2) {
+    return true;
+  }
+
   if (!is_reduction_operator(n)) {
     return false;
   }
