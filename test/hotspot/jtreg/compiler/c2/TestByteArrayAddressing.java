@@ -89,4 +89,13 @@ public class TestByteArrayAddressing {
     private static int testMultipleOffsets(byte[] byteArray, int i) {
         return byteArray[i] + byteArray[i + 1] + byteArray[i + 2];
     }
+
+    @Test
+    @Arguments(setup = "setupTwoArrays")
+    @IR(counts = {IRNode.X86_SCONV_I2L, "= 20"},
+        applyIfPlatform = {"x64", "true"},
+        phase = CompilePhase.MATCHING)
+    private static int testMultipleArraysMultiOffset(byte[] b1, byte[] b2, byte[] b3, int i) {
+        return b1[i] + b2[i + 1] + b3[i + 2];
+    }
 }
