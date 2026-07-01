@@ -54,11 +54,13 @@ public class TestByteArrayAddressing {
     public static Object[] setupTwoArrays() {
         final byte[] b1 = new byte[100];
         final byte[] b2 = new byte[100];
+        final byte[] b3 = new byte[100];
         for (int i = 0; i < b1.length; i++) {
             b1[i] = GEN_I.next().byteValue();
             b2[i] = GEN_I.next().byteValue();
+            b3[i] = GEN_I.next().byteValue();
         }
-        return new Object[] {b1, b2, 42};
+        return new Object[] {b1, b2, b3, 42};
     }
 
     @Test
@@ -66,8 +68,8 @@ public class TestByteArrayAddressing {
     @IR(counts = {IRNode.X86_SCONV_I2L, "= 20"},
         applyIfPlatform = {"x64", "true"},
         phase = CompilePhase.MATCHING)
-    private static int testSingleOffset(byte[] b1, byte[] b2, int i) {
-        return b1[i] + b2[i];
+    private static int testSingleOffset(byte[] b1, byte[] b2, byte[] b3, int i) {
+        return b1[i] + b2[i] + b3[i];
     }
 
     @Setup
