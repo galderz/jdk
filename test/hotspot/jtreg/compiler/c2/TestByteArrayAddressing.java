@@ -64,7 +64,7 @@ public class TestByteArrayAddressing {
     }
 
     @Test
-    @Arguments(setup = "setupTwoArrays")
+    @Arguments(setup = "setupMultiArrays")
     @IR(counts = {IRNode.X86_SCONV_I2L, "= 20"},
         applyIfPlatform = {"x64", "true"},
         phase = CompilePhase.MATCHING)
