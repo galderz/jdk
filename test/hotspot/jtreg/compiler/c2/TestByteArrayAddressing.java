@@ -27,7 +27,7 @@
  * @summary Verify that optimal byte array addressing is in use
  * @modules java.base/jdk.internal.misc
  * @library /test/lib /
- * @run driver ${test.main.class}
+ * @run main ${test.main.class}
  * @run main/othervm -XX:+UseNewCode ${test.main.class}
  */
 
