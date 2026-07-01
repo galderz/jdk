@@ -51,7 +51,7 @@ public class TestByteArrayAddressing {
     }
 
     @Setup
-    public static Object[] setupTwoArrays() {
+    public static Object[] setupMultiArrays() {
         final byte[] b1 = new byte[100];
         final byte[] b2 = new byte[100];
         final byte[] b3 = new byte[100];
@@ -91,11 +91,29 @@ public class TestByteArrayAddressing {
     }
 
     @Test
-    @Arguments(setup = "setupTwoArrays")
+    @Arguments(setup = "setupMultiArrays")
     @IR(counts = {IRNode.X86_SCONV_I2L, "= 20"},
         applyIfPlatform = {"x64", "true"},
         phase = CompilePhase.MATCHING)
     private static int testMultipleArraysMultiOffset(byte[] b1, byte[] b2, byte[] b3, int i) {
         return b1[i] + b2[i + 1] + b3[i + 2];
+    }
+
+    @Test
+    @Arguments(setup = "setupMultiArrays")
+    @IR(counts = {IRNode.X86_SCONV_I2L, "= 20"},
+        applyIfPlatform = {"x64", "true"},
+        phase = CompilePhase.MATCHING)
+    private static int test04(byte[] in1B, byte[] in2B, byte[] in3B, int i) {
+        return (byte)((in1B[i] * in2B[i]) + (in1B[i] * in3B[i]) + (in2B[i] * in3B[i]));
+    }
+
+    @Test
+    @Arguments(setup = "setupMultiArrays")
+    @IR(counts = {IRNode.X86_SCONV_I2L, "= 20"},
+        applyIfPlatform = {"x64", "true"},
+        phase = CompilePhase.MATCHING)
+    private static int test05(byte[] in1B, byte[] in2B, byte[] in3B, int i) {
+        return (byte)((in1B[i] * in2B[i]) + (in1B[i + 1] * in3B[i]) + (in2B[i + 1] * in3B[i + 1]));
     }
 }
