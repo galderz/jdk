@@ -33,14 +33,11 @@
 package compiler.c2;
 
 import compiler.lib.generators.Generator;
-import compiler.lib.generators.Generators;
-import compiler.lib.ir_framework.Argument;
 import compiler.lib.ir_framework.Arguments;
 import compiler.lib.ir_framework.CompilePhase;
 import compiler.lib.ir_framework.IR;
 import compiler.lib.ir_framework.IRNode;
 import compiler.lib.ir_framework.Setup;
-import compiler.lib.ir_framework.SetupInfo;
 import compiler.lib.ir_framework.Test;
 import compiler.lib.ir_framework.TestFramework;
 
@@ -54,7 +51,27 @@ public class TestByteArrayAddressing {
     }
 
     @Setup
-    public static Object[] setup() {
+    public static Object[] setupTwoArrays() {
+        final byte[] b1 = new byte[100];
+        final byte[] b2 = new byte[100];
+        for (int i = 0; i < b1.length; i++) {
+            b1[i] = GEN_I.next().byteValue();
+            b2[i] = GEN_I.next().byteValue();
+        }
+        return new Object[] {b1, b2, 42};
+    }
+
+    @Test
+    @Arguments(setup = "setupTwoArrays")
+    @IR(counts = {IRNode.X86_SCONV_I2L, "= 20"},
+        applyIfPlatform = {"x64", "true"},
+        phase = CompilePhase.MATCHING)
+    private static int testSingleOffset(byte[] b1, byte[] b2, int i) {
+        return b1[i] + b2[i];
+    }
+
+    @Setup
+    public static Object[] setupOneArray() {
         final byte[] bytes = new byte[100];
         for (int i = 0; i < bytes.length; i++) {
             bytes[i] = GEN_I.next().byteValue();
@@ -63,16 +80,7 @@ public class TestByteArrayAddressing {
     }
 
     @Test
-    @Arguments(setup = "setup")
-    @IR(counts = {IRNode.X86_SCONV_I2L, "= 20"},
-        applyIfPlatform = {"x64", "true"},
-        phase = CompilePhase.MATCHING)
-    private static byte testSingleOffset(byte[] byteArray, int i) {
-        return byteArray[i];
-    }
-
-    @Test
-    @Arguments(setup = "setup")
+    @Arguments(setup = "setupOneArray")
     @IR(counts = {IRNode.X86_SCONV_I2L, "= 20"},
         applyIfPlatform = {"x64", "true"},
         phase = CompilePhase.MATCHING)
