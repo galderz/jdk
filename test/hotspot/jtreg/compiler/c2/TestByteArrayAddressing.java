@@ -116,4 +116,17 @@ public class TestByteArrayAddressing {
     private static int test05(byte[] in1B, byte[] in2B, byte[] in3B, int i) {
         return (byte)((in1B[i] * in2B[i]) + (in1B[i + 1] * in3B[i]) + (in2B[i + 1] * in3B[i + 1]));
     }
+
+    @Test
+    @Arguments(setup = "setupMultiArrays")
+    @IR(counts = {IRNode.X86_SCONV_I2L, "= 20"},
+        applyIfPlatform = {"x64", "true"},
+        phase = CompilePhase.MATCHING)
+    private static int test06(byte[] in1B, byte[] in2B, byte[] in3B, int i) {
+        byte v0 = (byte)((in1B[i] * in2B[i]) + (in1B[i] * in3B[i]) + (in2B[i] * in3B[i]));
+        byte v1 = (byte)((in1B[i + 1] * in2B[i + 1]) + (in1B[i + 1] * in3B[i + 1]) + (in2B[i + 1] * in3B[i + 1]));
+        byte v2 = (byte)((in1B[i + 2] * in2B[i + 2]) + (in1B[i + 2] * in3B[i + 2]) + (in2B[i + 2] * in3B[i + 2]));
+        byte v3 = (byte)((in1B[i + 3] * in2B[i + 3]) + (in1B[i + 3] * in3B[i + 3]) + (in2B[i + 3] * in3B[i + 3]));
+        return v0 ^ v1 ^ v2 ^ v3;
+    }
 }
