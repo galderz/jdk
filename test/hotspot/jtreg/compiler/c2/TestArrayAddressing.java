@@ -41,6 +41,7 @@ import compiler.lib.template_framework.library.TestFrameworkClass;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 
 import static compiler.lib.template_framework.Template.let;
 import static compiler.lib.template_framework.Template.scope;
@@ -76,7 +77,7 @@ public class TestArrayAddressing {
             // package and class name.
             "compiler.c2.templated", "ArrayAddressing",
             // List of imports.
-            Collections.emptySet(),
+            Set.of("compiler.lib.generators.*"),
             // classpath, so the Test VM has access to the compiled class files.
             comp.getEscapedClassPathOfCompiledClasses(),
             // The list of tests.
@@ -86,7 +87,7 @@ public class TestArrayAddressing {
     static TemplateToken valueGenerator() {
         var template = Template.make(() -> scope(
             """
-            private static final Generator<Integer> GEN_I = G.ints();
+            private static final Generator<Integer> GEN_I = Generators.G.ints();
             """
         ));
         return template.asToken();
@@ -115,7 +116,7 @@ public class TestArrayAddressing {
                     return arr[i];
                 }
 
-                static volatile int volatileField;
+                static volatile int $volatileField;
 
                 @Test
                 @Arguments(setup = "$setup")
@@ -125,7 +126,7 @@ public class TestArrayAddressing {
                 private static int $testSameOffset(#type[] arr, int i) {
                     i = Integer.min(Integer.max(i, 0), 1000);
                     int v = arr[i];
-                    volatileField = 42;
+                    $volatileField = 42;
                     return v + arr[i];
                 }
 
