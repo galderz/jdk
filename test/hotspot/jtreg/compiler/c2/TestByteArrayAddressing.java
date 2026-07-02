@@ -129,4 +129,14 @@ public class TestByteArrayAddressing {
         byte v3 = (byte)((in1B[i + 3] * in2B[i + 3]) + (in1B[i + 3] * in3B[i + 3]) + (in2B[i + 3] * in3B[i + 3]));
         return v0 ^ v1 ^ v2 ^ v3;
     }
+
+    @Test
+    @Arguments(setup = "setupMultiArrays")
+    @IR(counts = {IRNode.X86_SCONV_I2L, "= 20"},
+        applyIfPlatform = {"x64", "true"},
+        phase = CompilePhase.MATCHING)
+    private static int test07(byte[] b1, byte[] b2, byte[] b3, int i) {
+        i = Integer.min(Integer.max(i, 0), Integer.MAX_VALUE - 1);
+        return b1[i] + b2[i] + b3[i];
+    }
 }
