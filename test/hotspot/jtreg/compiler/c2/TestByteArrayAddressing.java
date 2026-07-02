@@ -78,7 +78,7 @@ public class TestByteArrayAddressing {
         for (int i = 0; i < bytes.length; i++) {
             bytes[i] = GEN_I.next().byteValue();
         }
-        return new Object[] {bytes, 42, 82};
+        return new Object[] {bytes, 42};
     }
 
     @Test
@@ -90,15 +90,17 @@ public class TestByteArrayAddressing {
         return b[i];
     }
 
+    static volatile int volatileField;
+
     @Test
     @Arguments(setup = "setup")
     @IR(counts = {IRNode.X86_SCONV_I2L, "= 0"},
         applyIfPlatform = {"x64", "true"},
         phase = CompilePhase.MATCHING)
-    private static int testSameOffset(byte[] b, int i, int j) {
+    private static int testSameOffset(byte[] b, int i) {
         i = Integer.min(Integer.max(i, 0), 1000);
         int v = b[i];
-        b[j] = 42;
+        volatileField = 42;
         return v + b[i];
     }
 
