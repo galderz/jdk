@@ -78,7 +78,7 @@ public class TestByteArrayAddressing {
         for (int i = 0; i < bytes.length; i++) {
             bytes[i] = GEN_I.next().byteValue();
         }
-        return new Object[] {bytes, 42};
+        return new Object[] {bytes, 42, 82};
     }
 
     @Test
@@ -86,9 +86,20 @@ public class TestByteArrayAddressing {
     @IR(counts = {IRNode.X86_SCONV_I2L, "= 0"},
         applyIfPlatform = {"x64", "true"},
         phase = CompilePhase.MATCHING)
-    private static int testSameIndex(byte[] b, int i) {
+    private static int test(byte[] b, int i) {
+        return b[i];
+    }
+
+    @Test
+    @Arguments(setup = "setup")
+    @IR(counts = {IRNode.X86_SCONV_I2L, "= 0"},
+        applyIfPlatform = {"x64", "true"},
+        phase = CompilePhase.MATCHING)
+    private static int testSameOffset(byte[] b, int i, int j) {
         i = Integer.min(Integer.max(i, 0), 1000);
-        return b[i] + b[i];
+        int v = b[i];
+        b[j] = 42;
+        return v + b[i];
     }
 
     @Test
@@ -96,7 +107,7 @@ public class TestByteArrayAddressing {
     @IR(counts = {IRNode.X86_SCONV_I2L, "= 0"},
         applyIfPlatform = {"x64", "true"},
         phase = CompilePhase.MATCHING)
-    private static int testDifferentIndex(byte[] b, int i) {
+    private static int testDifferentOffset(byte[] b, int i) {
         i = Integer.min(Integer.max(i, 0), 1000);
         return b[i] + b[i + 1];
     }
