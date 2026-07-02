@@ -102,7 +102,7 @@ public class TestArrayAddressing {
                 public static Object[] $setup() {
                     final #type[] arr = new #type[100];
                     for (int i = 0; i < arr.length; i++) {
-                        arr[i] = (#type) GEN_I.next();
+                        arr[i] = (#type) GEN_I.next().intValue();
                     }
                     return new Object[] {arr, 42};
                 }
