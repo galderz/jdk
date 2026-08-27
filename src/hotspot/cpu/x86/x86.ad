@@ -4095,6 +4095,21 @@ bool Matcher::pd_clone_node(Node* n, Node* m, Matcher::MStack& mstack) {
 // into registers?
 bool Matcher::pd_clone_address_expressions(AddPNode* m, Matcher::MStack& mstack, VectorSet& address_visited) {
   Node *off = m->in(AddPNode::Offset);
+  if (UseNewCode2) {
+    tty->print("[pd_clone_addr] AddP(%d): base=%s(%d) adr=%s(%d) off=%s(%d)",
+               m->_idx,
+               m->in(AddPNode::Base)->Name(), m->in(AddPNode::Base)->_idx,
+               m->in(AddPNode::Address)->Name(), m->in(AddPNode::Address)->_idx,
+               off->Name(), off->_idx);
+    tty->print(" off->is_Con=%d", off->is_Con());
+    // Print users of this AddP
+    tty->print(" users=[");
+    for (DUIterator_Fast imax, i = m->fast_outs(imax); i < imax; i++) {
+      Node* use = m->fast_out(i);
+      tty->print("%s(%d) ", use->Name(), use->_idx);
+    }
+    tty->print_cr("]");
+  }
   if (off->is_Con()) {
     address_visited.test_set(m->_idx); // Flag as address_visited
     Node *adr = m->in(AddPNode::Address);
@@ -4110,13 +4125,25 @@ bool Matcher::pd_clone_address_expressions(AddPNode* m, Matcher::MStack& mstack,
         !is_visited(adr)) {
       address_visited.set(adr->_idx); // Flag as address_visited
       Node *shift_or_conv = adr->in(AddPNode::Offset);
+      if (UseNewCode2) {
+        tty->print_cr("[pd_clone_addr]   PATH=nested_addp, inner_off=%s(%d) outcnt=%d",
+                       shift_or_conv->Name(), shift_or_conv->_idx, shift_or_conv->outcnt());
+      }
       if (!clone_shift(shift_or_conv, this, mstack, address_visited) &&
           !clone_conv(shift_or_conv, this, mstack, address_visited)) {
+        if (UseNewCode2) {
+          tty->print_cr("[pd_clone_addr]   clone_shift=false, clone_conv=false -> push as Pre_Visit");
+        }
         mstack.push(shift_or_conv, Pre_Visit);
+      } else if (UseNewCode2) {
+        tty->print_cr("[pd_clone_addr]   cloned successfully");
       }
       mstack.push(adr->in(AddPNode::Address), Pre_Visit);
       mstack.push(adr->in(AddPNode::Base), Pre_Visit);
     } else {
+      if (UseNewCode2) {
+        tty->print_cr("[pd_clone_addr]   PATH=simple_const_off");
+      }
       mstack.push(adr, Pre_Visit);
     }
 
@@ -4126,10 +4153,16 @@ bool Matcher::pd_clone_address_expressions(AddPNode* m, Matcher::MStack& mstack,
     return true;
   } else if (clone_shift(off, this, mstack, address_visited) ||
              clone_conv(off, this, mstack, address_visited)) {
+    if (UseNewCode2) {
+      tty->print_cr("[pd_clone_addr]   PATH=non_const_off_cloned (shift or conv)");
+    }
     address_visited.test_set(m->_idx); // Flag as address_visited
     mstack.push(m->in(AddPNode::Address), Pre_Visit);
     mstack.push(m->in(AddPNode::Base), Pre_Visit);
     return true;
+  }
+  if (UseNewCode2) {
+    tty->print_cr("[pd_clone_addr]   PATH=no_match, returning false");
   }
   return false;
 }
