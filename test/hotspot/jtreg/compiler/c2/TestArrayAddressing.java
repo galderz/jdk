@@ -101,6 +101,7 @@ public class TestArrayAddressing {
         TemplateToken generate() {
             var template = Template.make(() -> scope(
                 let("type", type.name()),
+                let("uMethodName", "get" + type.name().substring(0, 1).toUpperCase() + type.name().substring(1)),
                 """
                 @Setup
                 public static Object[] $setupOneArray() {
@@ -164,7 +165,7 @@ public class TestArrayAddressing {
                     phase = CompilePhase.MATCHING)
                 private static int $testUnsafe(#type[] a, #type b[], int offset) {
                     int checked = Objects.checkIndex(offset, 1000);
-                    return UNSAFE.getByte(a, checked) + UNSAFE.getByte(b, checked);
+                    return UNSAFE.#uMethodName(a, checked) + UNSAFE.#uMethodName(b, checked);
                 }
                 """
             ));
