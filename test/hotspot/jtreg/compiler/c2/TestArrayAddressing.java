@@ -27,7 +27,7 @@
  * @summary Verify lower IR expectations for array addressing operations
  * @modules java.base/jdk.internal.misc
  * @library /test/lib /
- * @run driver ${test.main.class}
+ * @run main/othervm --add-exports=java.base/jdk.internal.misc=ALL-UNNAMED ${test.main.class}
  */
 
 package compiler.c2;
