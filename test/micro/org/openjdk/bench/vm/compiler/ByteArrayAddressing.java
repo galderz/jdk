@@ -42,29 +42,27 @@ import java.util.concurrent.TimeUnit;
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
 @Warmup(iterations = 2, time = 1, timeUnit = TimeUnit.SECONDS)
 @Measurement(iterations = 3, time = 1, timeUnit = TimeUnit.SECONDS)
+@State(Scope.Thread)
 @Fork(3)
 public class ByteArrayAddressing {
 
-    @State(Scope.Thread)
-    public static class State {
-        @Param("0")
-        private int seed;
-        private Random r = new Random(seed);
+    @Param("0")
+    private int seed;
+    private Random r = new Random(seed);
 
-        int index;
+    int index;
 
-        byte[] a;
+    byte[] a;
 
-        @Setup
-        public void init() {
-            index = 42;
-            a = new byte[100];
-        }
+    @Setup
+    public void init() {
+        index = 42;
+        a = new byte[100];
     }
 
     @Benchmark
-    public static int test(State state) {
-        int i = Integer.min(Integer.max(state.index, 0), 1000);
-        return state.a[i] + state.a[i + 1];
+    public int test() {
+        int i = Integer.min(Integer.max(index, 0), 1000);
+        return a[i] + a[i + 1];
     }
 }
