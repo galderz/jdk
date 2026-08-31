@@ -39,7 +39,7 @@ import java.util.Random;
 import java.util.concurrent.TimeUnit;
 
 @BenchmarkMode(Mode.Throughput)
-@OutputTimeUnit(TimeUnit.NANOSECONDS)
+@OutputTimeUnit(TimeUnit.MICROSECONDS)
 @Warmup(iterations = 5, time = 5, timeUnit = TimeUnit.SECONDS)
 @Measurement(iterations = 4, time = 5, timeUnit = TimeUnit.SECONDS)
 @State(Scope.Thread)
