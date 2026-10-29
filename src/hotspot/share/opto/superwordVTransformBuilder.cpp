@@ -258,11 +258,22 @@ VTransformNode* SuperWordVTransformBuilder::get_or_make_vtnode_vector_input_at_i
     BasicType def_bt = _vloop_analyzer.types().velt_basic_type(in_p0);
     BasicType use_bt = _vloop_analyzer.types().velt_basic_type(p0);
 
-    // If the use and def types are different, emit a cast node
-    if (use_bt != def_bt && !p0->is_Convert() && VectorCastNode::is_supported_subword_cast(def_bt, use_bt, pack->size())) {
+    // If the use and def types are different, emit a cast node:
+    // a supported subword cast uses the signed opcode, while an implicit
+    // unsigned widening (e.g. LoadUB feeding int) uses the unsigned opcode.
+    bool unsigned_cast = VectorCastNode::is_supported_unsigned_cast(def_bt, use_bt, pack->size(), in_p0->Opcode());
+    if (use_bt != def_bt && !p0->is_Convert() &&
+        (VectorCastNode::is_supported_subword_cast(def_bt, use_bt, pack->size()) || unsigned_cast)) {
       VTransformNode* in = get_vtnode(pack_in->at(0));
       const VTransformVectorNodeProperties properties = VTransformVectorNodeProperties::make_from_pack(pack, _vloop_analyzer);
-      VTransformNode* cast = new (_vtransform.arena()) VTransformElementWiseVectorNode(_vtransform, 2, properties, VectorCastNode::opcode(-1, def_bt));
+      // Unsigned loads widen from their memory lanes: byte lanes for LoadUB,
+      // short lanes for LoadUS. The unsigned opcode is selected explicitly
+      // because the velt types (T_BOOLEAN/T_CHAR) have no unsigned mapping
+      // in VectorCastNode::opcode.
+      int vopc = unsigned_cast ? VectorCastNode::opcode(-1, in_p0->Opcode() == Op_LoadUB ? T_BYTE : T_SHORT,
+                                                        /* is_signed */ false)
+                               : VectorCastNode::opcode(-1, def_bt);
+      VTransformNode* cast = new (_vtransform.arena()) VTransformElementWiseVectorNode(_vtransform, 2, properties, vopc);
       cast->set_req(1, in);
 
       return cast;
