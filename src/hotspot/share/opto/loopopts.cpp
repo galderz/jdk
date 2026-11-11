@@ -4821,10 +4821,7 @@ public:
       if (loop_head_use->is_Phi()) {
         PhiNode* phi = loop_head_use->as_Phi();
         for (DUIterator j = phi->outs(); phi->has_out(j); j++) {
-          Node* n = phi->out(j);
-          if (try_reassociate_chain(n, phi)) {
-            --j;
-          }
+          try_reassociate_chain(phi->out(j), phi);
         }
       }
     }
