@@ -5304,6 +5304,9 @@ void C2_MacroAssembler::vector_round_float_avx(XMMRegister dst, XMMRegister src,
 void C2_MacroAssembler::vector_unsigned_cast(XMMRegister dst, XMMRegister src, int vlen_enc,
                                              BasicType from_elem_bt, BasicType to_elem_bt) {
   switch (from_elem_bt) {
+    // T_BOOLEAN vectors hold unsigned byte lanes (LoadUB packs materialize
+    // as boolean, see container_type); zero-extend exactly like T_BYTE.
+    case T_BOOLEAN:
     case T_BYTE:
       switch (to_elem_bt) {
         case T_SHORT: vpmovzxbw(dst, src, vlen_enc); break;
@@ -5313,6 +5316,9 @@ void C2_MacroAssembler::vector_unsigned_cast(XMMRegister dst, XMMRegister src, i
       }
       break;
     case T_SHORT:
+    // T_CHAR vectors hold unsigned short lanes (LoadUS packs materialize
+    // as char); zero-extend exactly like T_SHORT.
+    case T_CHAR:
       switch (to_elem_bt) {
         case T_INT:  vpmovzxwd(dst, src, vlen_enc); break;
         case T_LONG: vpmovzxwq(dst, src, vlen_enc); break;
